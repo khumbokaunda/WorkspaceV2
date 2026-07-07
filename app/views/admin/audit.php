@@ -22,10 +22,12 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxAuditTable, 'audit')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-audit-table" class="table mx-stack align-middle" style="width:100%">
-            <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th><th>IP</th></tr></thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-responsive">
+            <table id="mx-audit-table" class="table mx-stack align-middle mb-0" style="width:100%">
+                <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th><th>IP</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -50,13 +52,16 @@ function mxLoadAudit() {
                     var d = JSON.parse(a.detail || '{}');
                     detail = Object.keys(d).map(function (k) { return k + ': ' + JSON.stringify(d[k]); }).join(', ');
                 } catch (e) { detail = a.detail || ''; }
+                var when = MX.escape(a.created_at).replace(' ', '<br>');
+                var detailFull = MX.escape(detail);
+                var detailShort = MX.escape(detail.length > 90 ? detail.slice(0, 90) + '…' : detail);
                 return [
-                    '<span class="mx-tabular">' + a.created_at + '</span>',
+                    '<span class="mx-tabular" style="white-space:nowrap">' + when + '</span>',
                     MX.escape(a.username || 'system'),
                     '<code>' + MX.escape(a.action) + '</code>',
-                    MX.escape(a.entity + (a.entity_id ? ' #' + a.entity_id : '')),
-                    '<span style="font-size:12px">' + MX.escape(detail.length > 140 ? detail.slice(0, 140) + '…' : detail) + '</span>',
-                    '<code style="font-size:11px">' + MX.escape(a.ip_address || '') + '</code>'
+                    '<span style="white-space:nowrap">' + MX.escape(a.entity + (a.entity_id ? ' #' + a.entity_id : '')) + '</span>',
+                    '<span class="mx-audit-detail" style="font-size:12px" title="' + detailFull + '">' + detailShort + '</span>',
+                    '<code style="font-size:11px;white-space:nowrap">' + MX.escape(a.ip_address || '') + '</code>'
                 ];
             });
             if (window.mxAuditTable) { window.mxAuditTable.clear(); window.mxAuditTable.rows.add(rows).draw(); }

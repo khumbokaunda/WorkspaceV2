@@ -420,6 +420,22 @@ div.dt-container .dt-paging .dt-paging-button.current:hover {
 
 .mx-row-click { cursor: pointer; }
 
+/* Audit detail can be long JSON. Cap its width and clip with an ellipsis so
+   it cannot push the table wide and clip the columns after it. The full
+   text stays available in the cell title. */
+.mx-audit-detail {
+    display: inline-block;
+    max-width: 340px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    color: var(--mx-muted);
+}
+@media (max-width: 767.98px) {
+    .mx-audit-detail { max-width: 60vw; }
+}
+
 /* -------------------------------------------------------- empty states -- */
 
 .mx-empty {
