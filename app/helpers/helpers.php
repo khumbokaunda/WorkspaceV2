@@ -151,10 +151,12 @@ function render_error(int $status, string $title, string $message): never
     if (is_api_request()) {
         json_err($message, $status);
     }
-    if (!empty($_SESSION['user_id'])) {
-        render('errors/error', ['pageTitle' => $title, 'errTitle' => $title, 'errMessage' => $message, 'errStatus' => $status]);
-    }
-    render('errors/error', ['pageTitle' => $title, 'errTitle' => $title, 'errMessage' => $message, 'errStatus' => $status], false);
+    $inShell = !empty($_SESSION['user_id']);
+    render(
+        'errors/error',
+        ['pageTitle' => $title, 'errTitle' => $title, 'errMessage' => $message, 'errStatus' => $status],
+        $inShell
+    );
 }
 
 // ---------------------------------------------------------------------------

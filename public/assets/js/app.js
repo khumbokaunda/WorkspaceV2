@@ -311,6 +311,13 @@
 
     // ------------------------------------------------------------ boot --
     document.addEventListener('DOMContentLoaded', function () {
+        // Theme icon reflects the theme applied before first paint.
+        const themeIcon = document.getElementById('mx-theme-icon');
+        if (themeIcon) {
+            const current = document.documentElement.getAttribute('data-bs-theme');
+            themeIcon.className = current === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        }
+
         // Sidebar toggles.
         const collapseBtn = document.getElementById('mx-sidebar-toggle');
         if (collapseBtn) {
