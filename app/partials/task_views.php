@@ -230,9 +230,16 @@ function mxOpenTask(id) {
             if (!data.ok) { MX.drawer.close(); MX.fail(data.error); return; }
             var t = data.task;
             var overdue = t.due_date && t.due_date < mxToday && t.status !== 'Done';
+            var completedBanner = '';
+            if (t.status === 'Done' && t.completed_at) {
+                completedBanner =
+                    '<div class="mx-card-body p-2 mb-3" style="background:var(--mx-success-tint);color:var(--mx-success);border-radius:var(--mx-radius-input);display:flex;align-items:center;gap:8px;font-size:13px">' +
+                    '<i class="fa-solid fa-circle-check"></i><span>Completed on ' + MX.escape(t.completed_at) + '</span></div>';
+            }
             var body =
                 '<div class="d-flex gap-2 align-items-center mb-3 flex-wrap">' + mxStatusChipT(t.status) + mxPrioChip(t.priority) +
                 (overdue ? '<span class="mx-chip mx-chip-danger">Overdue</span>' : '') + '</div>' +
+                completedBanner +
                 (t.description ? '<p style="font-size:13px;white-space:pre-wrap">' + MX.escape(t.description) + '</p>' : '<p class="text-muted" style="font-size:13px">No description.</p>') +
                 '<dl class="row" style="font-size:13px">' +
                 '<dt class="col-4 text-muted fw-normal">Project</dt><dd class="col-8">' + MX.escape(t.project_name || 'None') + '</dd>' +
@@ -243,7 +250,7 @@ function mxOpenTask(id) {
                 '</dl>' +
                 '<div class="mb-3"><label class="form-label">Status</label><select class="form-select form-select-sm" id="task-status-select">' +
                 TASK_STATUSES.map(function (s) { return '<option' + (t.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
-                '</select></div>' +
+                '</select><div class="form-text">Set this to Done to mark the task complete, or drag its card to the Done column on the board.</div></div>' +
                 '<hr><h3 style="font-size:14px" class="mb-2">Comments and activity</h3>' +
                 '<div id="task-comments">' +
                 (data.comments.length ? data.comments.map(function (c) {

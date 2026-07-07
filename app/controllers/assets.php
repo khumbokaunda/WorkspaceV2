@@ -81,6 +81,11 @@ function create(): void
         ]
     );
     $assetId = db_insert_id();
+    // Confirm the row was actually written before reporting success, so a
+    // silent write failure can never surface to the user as a completed action.
+    if ($assetId <= 0 || !db_val('SELECT id FROM assets WHERE id = ?', [$assetId])) {
+        json_err('The asset could not be saved. Please try again, and check the server logs if it persists.', 500);
+    }
     audit('asset.create', 'asset', $assetId, ['tag' => in_str('asset_tag')]);
     json_ok(['asset_id' => $assetId]);
 }

@@ -64,6 +64,11 @@ try {
     $dbc = $GLOBALS['config']['db'];
     $GLOBALS['db'] = new mysqli($dbc['host'], $dbc['user'], $dbc['pass'], $dbc['name'], (int)$dbc['port']);
     $GLOBALS['db']->set_charset($dbc['charset'] ?? 'utf8mb4');
+    // Force autocommit on. Some server configurations disable it globally,
+    // which would let an INSERT report success and then roll back silently
+    // when the connection closes at the end of the request. Each request is
+    // its own short-lived connection, so committing per statement is correct.
+    $GLOBALS['db']->autocommit(true);
     // Align the database session clock with the application timezone so
     // NOW() and PHP time comparisons agree regardless of the server clock.
     $GLOBALS['db']->query("SET time_zone = '" . (new DateTime())->format('P') . "'");

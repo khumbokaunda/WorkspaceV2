@@ -81,6 +81,35 @@ function update(string $id): void
     $me = current_user();
     $in = input();
 
+    // Username and email. Both are unique across accounts; the person record
+    // keeps its own email separately, so changing one here does not touch it.
+    if (array_key_exists('username', $in)) {
+        $username = in_str('username');
+        if (mb_strlen($username) < 3 || mb_strlen($username) > 60) {
+            json_err('The username must be between 3 and 60 characters.', 422, ['username' => 'Between 3 and 60 characters.']);
+        }
+        if (db_val('SELECT id FROM users WHERE username = ? AND id <> ?', [$username, $userId])) {
+            json_err('That username is already taken.', 422, ['username' => 'Already taken.']);
+        }
+        if ($username !== $user['username']) {
+            db_query('UPDATE users SET username = ? WHERE id = ?', [$username, $userId]);
+            audit('user.username_change', 'user', $userId, ['from' => $user['username'], 'to' => $username]);
+        }
+    }
+    if (array_key_exists('email', $in)) {
+        $email = in_str('email');
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 190) {
+            json_err('Enter a valid email address.', 422, ['email' => 'Enter a valid email address.']);
+        }
+        if (db_val('SELECT id FROM users WHERE email = ? AND id <> ?', [$email, $userId])) {
+            json_err('That email address belongs to another account.', 422, ['email' => 'Already in use.']);
+        }
+        if ($email !== $user['email']) {
+            db_query('UPDATE users SET email = ? WHERE id = ?', [$email, $userId]);
+            audit('user.email_change', 'user', $userId, ['from' => $user['email'], 'to' => $email]);
+        }
+    }
+
     // Role change.
     if (array_key_exists('role_id', $in)) {
         $roleId = in_int('role_id');

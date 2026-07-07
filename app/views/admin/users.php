@@ -84,7 +84,8 @@ function mxEditUser(id) {
     var u = mxUsers.find(function (x) { return x.id === id; });
     if (!u) return;
     var body = '<form id="user-edit-form">' +
-        '<p class="mb-3"><strong>' + MX.escape(u.username) + '</strong> <span class="text-muted">' + MX.escape(u.email) + '</span></p>' +
+        '<div class="mb-3"><label class="form-label">Username</label><input class="form-control" name="username" required minlength="3" maxlength="60" value="' + MX.escape(u.username) + '"></div>' +
+        '<div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" required maxlength="190" value="' + MX.escape(u.email) + '"></div>' +
         '<div class="mb-3"><label class="form-label">Role</label><select class="form-select" name="role_id">' +
         mxRoles.map(function (r) { return '<option value="' + r.id + '"' + (u.role_id === r.id ? ' selected' : '') + '>' + MX.escape(r.name) + '</option>'; }).join('') + '</select></div>' +
         '<div class="mb-3"><label class="form-label">Linked person</label><select class="form-select" name="person_id"><option value="">None</option>' +
