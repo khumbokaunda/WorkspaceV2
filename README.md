@@ -17,7 +17,9 @@ value on the Settings screen, no code changes involved.
 
 Procedural PHP 8.2+ with mysqli prepared statements, MySQL 8.x (or
 MariaDB 10.11+), Bootstrap 5.3, jQuery 3.7, DataTables, Parsley,
-DOMPurify, SweetAlert2, PHPMailer, Inter and Font Awesome via CDN. No
+DOMPurify, SweetAlert2, PHPMailer, Inter and Font Awesome. All frontend
+libraries ship as pinned local copies under `public/assets/vendor/`, so
+the app renders identically with or without internet access. No
 framework, no ORM, no npm, no build step.
 
 ## Layout
