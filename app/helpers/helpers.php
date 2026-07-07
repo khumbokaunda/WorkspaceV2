@@ -411,13 +411,18 @@ function notify(int $userId, string $body, ?string $link = null, ?string $module
     );
 }
 
+// Broadcast to every active user holding a role. Rows are materialized per
+// user so read state stays a simple flag; role_id records the provenance.
 function notify_role(string $roleKey, string $body, ?string $link = null, ?string $moduleKey = null): void
 {
     $roleId = db_val('SELECT id FROM roles WHERE role_key = ?', [$roleKey]);
-    if ($roleId !== null) {
+    if ($roleId === null) {
+        return;
+    }
+    foreach (db_all('SELECT id FROM users WHERE role_id = ? AND is_active = 1', [(int)$roleId]) as $u) {
         db_query(
-            'INSERT INTO notifications (role_id, body, link, module_key) VALUES (?,?,?,?)',
-            [(int)$roleId, $body, $link, $moduleKey]
+            'INSERT INTO notifications (user_id, role_id, body, link, module_key) VALUES (?,?,?,?,?)',
+            [(int)$u['id'], (int)$roleId, $body, $link, $moduleKey]
         );
     }
 }
