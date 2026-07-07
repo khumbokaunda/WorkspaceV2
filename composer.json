@@ -1,0 +1,16 @@
+{
+    "name": "meridian/meridian",
+    "description": "Meridian workplace management system",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "suggest": {
+        "spomky-labs/otphp": "Optional TOTP two-factor support, opt-in only"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

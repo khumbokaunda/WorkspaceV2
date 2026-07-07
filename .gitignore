@@ -1,0 +1,8 @@
+config.php
+vendor/
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+composer.lock
+.DS_Store
