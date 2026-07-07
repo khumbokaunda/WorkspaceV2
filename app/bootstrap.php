@@ -28,6 +28,37 @@ if (is_file($composerAutoload)) {
 
 require APP_ROOT . '/app/helpers/helpers.php';
 
+// Turn any uncaught exception or fatal into a logged, visible response so a
+// failed write never disappears as a blank 500. API and AJAX callers get a
+// JSON error with a short reference id; the full detail goes to the log.
+set_exception_handler(function (Throwable $ex): void {
+    $ref = substr(bin2hex(random_bytes(4)), 0, 8);
+    error_log(sprintf(
+        "[ref %s] Uncaught %s: %s in %s:%d",
+        $ref, get_class($ex), $ex->getMessage(), $ex->getFile(), $ex->getLine()
+    ));
+    if (!headers_sent()) {
+        http_response_code(500);
+    }
+    if (function_exists('is_api_request') && is_api_request()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => false,
+            'error' => 'The server hit an error while saving. Reference ' . $ref . '. Check storage/logs/php-error.log for the detail.',
+            'ref' => $ref,
+        ]);
+    } else {
+        echo 'A server error occurred. Reference ' . $ref . '. See storage/logs/php-error.log for the detail.';
+    }
+    exit;
+});
+register_shutdown_function(function (): void {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log(sprintf('Fatal: %s in %s:%d', $err['message'], $err['file'], $err['line']));
+    }
+});
+
 // Hardened session, only for web requests. Cron scripts define MERIDIAN_CLI.
 if (!defined('MERIDIAN_CLI')) {
     $secure = (bool)($GLOBALS['config']['app']['https'] ?? false);

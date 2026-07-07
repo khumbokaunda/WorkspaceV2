@@ -30,18 +30,25 @@ function db(): mysqli
 // true for writes. Types are inferred: int -> i, float -> d, everything else -> s.
 function db_query(string $sql, array $params = [])
 {
-    $stmt = db()->prepare($sql);
-    if ($params) {
-        $types = '';
-        foreach ($params as $p) {
-            $types .= is_int($p) ? 'i' : (is_float($p) ? 'd' : 's');
+    try {
+        $stmt = db()->prepare($sql);
+        if ($params) {
+            $types = '';
+            foreach ($params as $p) {
+                $types .= is_int($p) ? 'i' : (is_float($p) ? 'd' : 's');
+            }
+            $stmt->bind_param($types, ...$params);
         }
-        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stmt->close();
+        return $result === false ? true : $result;
+    } catch (mysqli_sql_exception $ex) {
+        // Name the failing statement in the log so a rejected write (for
+        // example a strict-mode date or an enum mismatch) is easy to trace.
+        error_log('SQL failed: ' . $ex->getMessage() . ' | ' . preg_replace('/\s+/', ' ', trim($sql)));
+        throw $ex;
     }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stmt->close();
-    return $result === false ? true : $result;
 }
 
 function db_row(string $sql, array $params = []): ?array
