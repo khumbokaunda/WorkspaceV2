@@ -4,6 +4,54 @@
 
 declare(strict_types=1);
 
+// Live self-check for diagnosing an environment where writes appear to
+// succeed but do not persist. Reports the connected database, the autocommit
+// state and server details, then performs a real insert, reads it back and
+// removes it, so a commit problem or a wrong-database problem shows plainly.
+function system_check(): void
+{
+    $info = [
+        'db_host'    => (string)config('db.host'),
+        'db_name'    => (string)config('db.name'),
+        'db_version' => (string)db_val('SELECT VERSION()'),
+        'autocommit' => (string)db_val('SELECT @@autocommit'),
+        'sql_mode'   => (string)db_val('SELECT @@sql_mode'),
+        'has_autocommit_fix' => str_contains(@file_get_contents(APP_ROOT . '/app/bootstrap.php') ?: '', 'autocommit(true)'),
+        'asset_count' => (int)db_val('SELECT COUNT(*) FROM assets'),
+        'people_count' => (int)db_val('SELECT COUNT(*) FROM people'),
+    ];
+
+    // Round-trip write test on a throwaway tag.
+    $tag = 'SYSCHECK-' . bin2hex(random_bytes(3));
+    $persisted = false;
+    $writeError = null;
+    try {
+        db_query(
+            'INSERT INTO assets (asset_tag, name, category, status) VALUES (?,?,?,?)',
+            [$tag, 'System check probe', 'Other', 'Retired']
+        );
+        $newId = db_insert_id();
+        // Read back on a brand new connection so an uncommitted row (the
+        // autocommit-off case) reports as not persisted rather than a false pass.
+        $dbc = config('db');
+        $probe = @new mysqli($dbc['host'], $dbc['user'], $dbc['pass'], $dbc['name'], (int)$dbc['port']);
+        if ($probe && !$probe->connect_errno) {
+            $stmt = $probe->prepare('SELECT id FROM assets WHERE id = ?');
+            $stmt->bind_param('i', $newId);
+            $stmt->execute();
+            $persisted = (bool)$stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            $probe->close();
+        }
+        db_query('DELETE FROM assets WHERE asset_tag = ?', [$tag]);
+    } catch (Throwable $ex) {
+        $writeError = $ex->getMessage();
+    }
+    $info['write_test'] = $persisted ? 'passed' : 'failed';
+    $info['write_error'] = $writeError;
+    json_out(['ok' => true, 'check' => $info]);
+}
+
 function index(): void
 {
     $settings = [];

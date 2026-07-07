@@ -80,10 +80,55 @@
                 <p class="text-muted px-3 py-2 mb-0" style="font-size:12px">Changing a default applies to balances created after the change. Existing yearly balances keep their allocation.</p>
             </div>
         </div>
+
+        <div class="mx-card mt-3">
+            <div class="mx-card-header">
+                <h2>System check</h2>
+                <button class="btn btn-outline-primary btn-sm" onclick="mxSystemCheck()"><i class="fa-solid fa-stethoscope me-1"></i>Run check</button>
+            </div>
+            <div class="mx-card-body" id="mx-syscheck">
+                <p class="text-muted mb-0" style="font-size:13px">Confirms which database this instance writes to, whether writes actually persist, and whether the autocommit fix is present. Use this if a saved record does not appear.</p>
+            </div>
+        </div>
     </div>
 </div>
 
 <script>
+function mxSystemCheck() {
+    var box = document.getElementById('mx-syscheck');
+    box.innerHTML = '<span class="mx-skeleton mb-2" style="width:70%"></span><span class="mx-skeleton" style="width:50%"></span>';
+    fetch('/api/admin/system-check', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) { box.innerHTML = '<p style="color:var(--mx-danger)">' + MX.escape(data.error || 'Check failed.') + '</p>'; return; }
+            var c = data.check;
+            var writeOk = c.write_test === 'passed';
+            function row(label, value, good) {
+                var color = good === undefined ? 'var(--mx-text)' : (good ? 'var(--mx-success)' : 'var(--mx-danger)');
+                return '<div class="d-flex justify-content-between py-1 border-bottom" style="font-size:13px">' +
+                    '<span class="text-muted">' + label + '</span>' +
+                    '<span class="mx-mono" style="color:' + color + '">' + MX.escape(String(value)) + '</span></div>';
+            }
+            box.innerHTML =
+                (writeOk
+                    ? '<div class="mx-chip mx-chip-success mb-3">Writes persist correctly</div>'
+                    : '<div class="mx-chip mx-chip-danger mb-3">Writes are NOT persisting</div>') +
+                row('Database host', c.db_host) +
+                row('Database name', c.db_name) +
+                row('Server version', c.db_version) +
+                row('Autocommit', c.autocommit === '1' ? '1 (on)' : c.autocommit + ' (off)', c.autocommit === '1') +
+                row('Autocommit fix present', c.has_autocommit_fix ? 'yes' : 'no (redeploy needed)', c.has_autocommit_fix) +
+                row('Round-trip write test', c.write_test, writeOk) +
+                row('Assets in this database', c.asset_count) +
+                row('People in this database', c.people_count) +
+                (c.write_error ? '<p class="mt-2" style="color:var(--mx-danger);font-size:12px">Write error: ' + MX.escape(c.write_error) + '</p>' : '') +
+                (!writeOk && c.autocommit !== '1'
+                    ? '<p class="mt-2" style="font-size:12px">Autocommit is off on this server and the fix is ' + (c.has_autocommit_fix ? 'present but not taking effect (restart the web server or clear the PHP opcode cache)' : 'missing (deploy the latest app/bootstrap.php)') + '.</p>'
+                    : '');
+        })
+        .catch(function () { box.innerHTML = '<p style="color:var(--mx-danger)">The check could not run.</p>'; });
+}
+
 function mxSaveSettings() {
     var form = document.getElementById('set-form');
     var payload = MX.formData(form);
