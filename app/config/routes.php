@@ -13,6 +13,14 @@ return [
     ['POST',   '/logout',                     'auth@logout',                ['auth', 'csrf']],
     ['GET',    '/account/password',           'auth@password_form',         ['auth']],
     ['POST',   '/account/password',           'auth@password_submit',       ['auth', 'csrf']],
+
+    // Two-factor: challenge at login, and enrolment from the account area.
+    ['GET',    '/login/verify',               'auth@totp_challenge_form',   []],
+    ['POST',   '/login/verify',               'auth@totp_challenge_submit', ['throttle', 'csrf']],
+    ['GET',    '/account/two-factor',          'auth@totp_setup_form',           ['auth']],
+    ['POST',   '/account/two-factor/enable',   'auth@totp_enable',               ['auth', 'csrf']],
+    ['POST',   '/account/two-factor/disable',  'auth@totp_disable',              ['auth', 'csrf']],
+    ['POST',   '/account/two-factor/recovery', 'auth@totp_regenerate_recovery',  ['auth', 'csrf']],
     ['GET',    '/forgot-password',            'auth@forgot_form',           []],
     ['POST',   '/forgot-password',            'auth@forgot_submit',         ['throttle']],
     ['GET',    '/reset-password/{token}',     'auth@reset_form',            []],

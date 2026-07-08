@@ -43,9 +43,12 @@
                         <input class="form-check-input" type="checkbox" id="s-mail" name="mail_notifications" <?= ($settings['mail_notifications'] ?? '1') === '1' ? 'checked' : '' ?>>
                         <label class="form-check-label" for="s-mail">Send transactional email</label>
                     </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="s-totp" name="totp_required_admin" <?= ($settings['totp_required_admin'] ?? '0') === '1' ? 'checked' : '' ?>>
-                        <label class="form-check-label" for="s-totp">Require two-factor for administrators (takes effect once TOTP is enrolled)</label>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="s-totp" name="totp_required_admin" <?= ($settings['totp_required_admin'] ?? '0') === '1' ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="s-totp">Require two-factor authentication for administrator accounts</label>
+                        </div>
+                        <div class="form-text">When on, any administrator who has not enrolled is sent to the two-factor setup page on their next request and cannot use the rest of the app until they enrol.</div>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="mxSaveSettings()">Save settings</button>
                 </form>

@@ -67,6 +67,12 @@ function throttle_wait_seconds(string $username, string $ip): int
 function middleware_throttle(?string $arg = null): void
 {
     $username = trim((string)(input()['username'] ?? ''));
+    // The two-factor verify step has no username field. Fall back to the
+    // pending user's username (server side, never from the client) so
+    // per-username throttling still applies to code guesses.
+    if ($username === '' && !empty($_SESSION['totp_pending_user'])) {
+        $username = (string)db_val('SELECT username FROM users WHERE id = ?', [(int)$_SESSION['totp_pending_user']]);
+    }
     $wait = throttle_wait_seconds($username, request_ip());
     if ($wait <= 0) {
         return;

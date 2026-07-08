@@ -36,6 +36,14 @@ function route_dispatch(): void
 
         $params = array_slice($matches, 1);
 
+        // Every authenticated route also enforces the two-factor requirement
+        // for admins. The totp middleware whitelists the enrolment routes and
+        // logout, so injecting it after auth everywhere creates no loop.
+        if (in_array('auth', $middleware, true) && !in_array('totp', $middleware, true)) {
+            $pos = (int)array_search('auth', $middleware, true);
+            array_splice($middleware, $pos + 1, 0, 'totp');
+        }
+
         foreach ($middleware as $mw) {
             [$mwName, $mwArg] = array_pad(explode(':', $mw, 2), 2, null);
             $mwFile = APP_ROOT . '/app/middleware/' . $mwName . '.php';

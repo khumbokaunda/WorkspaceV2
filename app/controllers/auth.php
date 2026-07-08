@@ -54,6 +54,18 @@ function login_submit(): void
         redirect('/login');
     }
 
+    // Credentials are verified. If two-factor is enrolled, the user is not
+    // logged in yet: move to a short-lived pending state and require the code.
+    // The pending markers grant no access, since current_user reads user_id
+    // which is still unset here.
+    if (($user['totp_secret'] ?? null) !== null && $user['totp_secret'] !== '') {
+        session_regenerate_id(true);
+        unset($_SESSION['user_id']);
+        $_SESSION['totp_pending_user'] = (int)$user['id'];
+        $_SESSION['totp_pending_at'] = time();
+        redirect('/login/verify');
+    }
+
     // Success: fresh session id, fresh CSRF token.
     session_regenerate_id(true);
     $_SESSION['user_id'] = (int)$user['id'];
@@ -69,6 +81,239 @@ function login_submit(): void
         redirect('/account/password');
     }
     redirect('/dashboard');
+}
+
+// ---------------------------------------------------------------------------
+// Two-factor authentication (TOTP), opt-in per user.
+//
+// The secret and the recovery codes are the sensitive material. The secret is
+// only ever echoed on the enrolment screen and never logged or returned in
+// JSON elsewhere. Recovery codes are shown once at generation and stored only
+// as bcrypt hashes.
+// ---------------------------------------------------------------------------
+
+const TOTP_PENDING_TTL = 300; // 5 minutes
+
+// A 160-bit base32 secret, standard for authenticator apps and well within
+// the totp_secret column width.
+function totp_new_secret(): string
+{
+    return rtrim(\ParagonIE\ConstantTime\Base32::encodeUpper(random_bytes(20)), '=');
+}
+
+// Build a labelled TOTP object for a stored or candidate secret.
+function totp_for(string $secret, string $label): \OTPHP\TOTP
+{
+    $totp = \OTPHP\TOTP::create($secret);
+    $totp->setLabel($label);
+    $totp->setIssuer((string)setting('org_name', (string)config('app.name', 'Meridian')));
+    return $totp;
+}
+
+// Verify a 6-digit code against a secret with one step of drift tolerance.
+function totp_verify_code(string $secret, string $code): bool
+{
+    if (!preg_match('/^\d{6}$/', $code)) {
+        return false;
+    }
+    return \OTPHP\TOTP::create($secret)->verify($code, null, 1);
+}
+
+// Ten one-time recovery codes in the form XXXXX-XXXXX, returned as plaintext
+// for a single display. Only their bcrypt hashes are ever stored.
+function totp_generate_recovery_codes(int $count = 10): array
+{
+    $codes = [];
+    for ($i = 0; $i < $count; $i++) {
+        $raw = strtoupper(bin2hex(random_bytes(5)));
+        $codes[] = substr($raw, 0, 5) . '-' . substr($raw, 5, 5);
+    }
+    return $codes;
+}
+
+// Replace a user's recovery codes with a fresh set, returning the plaintext.
+function totp_store_recovery_codes(int $userId): array
+{
+    $codes = totp_generate_recovery_codes(10);
+    db_query('DELETE FROM totp_recovery_codes WHERE user_id = ?', [$userId]);
+    foreach ($codes as $c) {
+        db_query(
+            'INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES (?,?)',
+            [$userId, password_hash($c, PASSWORD_BCRYPT)]
+        );
+    }
+    return $codes;
+}
+
+function totp_recovery_remaining(int $userId): int
+{
+    return (int)db_val(
+        'SELECT COUNT(*) FROM totp_recovery_codes WHERE user_id = ? AND used_at IS NULL',
+        [$userId]
+    );
+}
+
+// Resolve and validate the pending two-factor login, or redirect to /login.
+// Returns the pending user row.
+function totp_require_pending(): array
+{
+    $pending = $_SESSION['totp_pending_user'] ?? null;
+    if (!$pending) {
+        redirect('/login');
+    }
+    if (time() - (int)($_SESSION['totp_pending_at'] ?? 0) > TOTP_PENDING_TTL) {
+        unset($_SESSION['totp_pending_user'], $_SESSION['totp_pending_at']);
+        flash('warning', 'That sign in step timed out. Please sign in again.');
+        redirect('/login');
+    }
+    $user = db_row('SELECT * FROM users WHERE id = ? AND is_active = 1', [(int)$pending]);
+    if (!$user || ($user['totp_secret'] ?? null) === null || $user['totp_secret'] === '') {
+        unset($_SESSION['totp_pending_user'], $_SESSION['totp_pending_at']);
+        redirect('/login');
+    }
+    return $user;
+}
+
+function totp_challenge_form(): void
+{
+    totp_require_pending();
+    render('auth/totp_verify', ['pageTitle' => 'Two-factor verification'], false);
+}
+
+function totp_challenge_submit(): void
+{
+    $user = totp_require_pending();
+    $useRecovery = !empty(input()['use_recovery']);
+    $code = preg_replace('/\s+/', '', in_str('code'));
+    $ip = request_ip();
+
+    $ok = false;
+    $viaRecovery = false;
+
+    if ($useRecovery) {
+        $submitted = strtoupper((string)$code);
+        foreach (db_all(
+            'SELECT id, code_hash FROM totp_recovery_codes WHERE user_id = ? AND used_at IS NULL',
+            [(int)$user['id']]
+        ) as $row) {
+            if (password_verify($submitted, $row['code_hash'])) {
+                db_query('UPDATE totp_recovery_codes SET used_at = NOW() WHERE id = ?', [(int)$row['id']]);
+                $ok = true;
+                $viaRecovery = true;
+                break;
+            }
+        }
+    } else {
+        $ok = totp_verify_code((string)$user['totp_secret'], (string)$code);
+    }
+
+    // Log the attempt so the existing throttle protects this step too.
+    db_query(
+        'INSERT INTO login_attempts (username, ip_address, successful) VALUES (?,?,?)',
+        [mb_substr((string)$user['username'], 0, 60), $ip, $ok ? 1 : 0]
+    );
+
+    if (!$ok) {
+        // Identical message for a wrong TOTP and a wrong recovery code.
+        flash('danger', 'That code was not correct.');
+        redirect('/login/verify');
+    }
+
+    // Full login.
+    session_regenerate_id(true);
+    $_SESSION['user_id'] = (int)$user['id'];
+    $_SESSION['login_time'] = time();
+    $_SESSION['last_activity'] = time();
+    unset($_SESSION['totp_pending_user'], $_SESSION['totp_pending_at'], $_SESSION['csrf_token']);
+    csrf_token();
+    db_query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [(int)$user['id']]);
+
+    if ($viaRecovery) {
+        $remaining = totp_recovery_remaining((int)$user['id']);
+        audit('two_factor.recovery_used', 'user', (int)$user['id'], ['remaining' => $remaining]);
+        flash('warning', 'You signed in with a recovery code. ' . $remaining . ' of your recovery codes remain. Consider regenerating them from the two-factor page.');
+    } else {
+        audit('two_factor.pass', 'user', (int)$user['id']);
+    }
+
+    if ((int)$user['must_change_password'] === 1) {
+        redirect('/account/password');
+    }
+    redirect('/dashboard');
+}
+
+function totp_setup_form(): void
+{
+    $user = current_user();
+    $enrolled = ($user['totp_secret'] ?? null) !== null && $user['totp_secret'] !== '';
+    $data = [
+        'pageTitle' => 'Two-factor authentication',
+        'breadcrumbs' => ['Account' => null, 'Two-factor authentication' => null],
+        'enrolled' => $enrolled,
+    ];
+    if ($enrolled) {
+        $data['recoveryRemaining'] = totp_recovery_remaining((int)$user['id']);
+    } else {
+        // A candidate secret, held in the session until a live code confirms it.
+        $secret = totp_new_secret();
+        $_SESSION['totp_candidate'] = $secret;
+        $label = (string)($user['email'] ?: $user['username']);
+        $data['secret'] = $secret;
+        $data['uri'] = totp_for($secret, $label)->getProvisioningUri();
+    }
+    render('auth/totp_setup', $data);
+}
+
+function totp_enable(): void
+{
+    $user = current_user();
+    if (($user['totp_secret'] ?? null) !== null && $user['totp_secret'] !== '') {
+        json_err('Two-factor is already enabled on this account.', 409);
+    }
+    $candidate = (string)($_SESSION['totp_candidate'] ?? '');
+    if ($candidate === '') {
+        json_err('Your setup session expired. Reload the page and start again.', 422);
+    }
+    $code = preg_replace('/\s+/', '', in_str('code'));
+    if (!totp_verify_code($candidate, (string)$code)) {
+        json_err('That code did not match. Check your authenticator app and try again.', 422, ['code' => 'Incorrect code.']);
+    }
+
+    db_query('UPDATE users SET totp_secret = ? WHERE id = ?', [$candidate, (int)$user['id']]);
+    unset($_SESSION['totp_candidate']);
+    $codes = totp_store_recovery_codes((int)$user['id']);
+    audit('two_factor.enabled', 'user', (int)$user['id']);
+    json_ok(['recovery_codes' => $codes]);
+}
+
+function totp_disable(): void
+{
+    $user = current_user();
+    // Disabling a security control always re-checks identity.
+    $password = (string)(input()['password'] ?? '');
+    if (!password_verify($password, (string)$user['password_hash'])) {
+        json_err('Your password is not correct.', 422, ['password' => 'Not correct.']);
+    }
+    db_query('UPDATE users SET totp_secret = NULL WHERE id = ?', [(int)$user['id']]);
+    db_query('DELETE FROM totp_recovery_codes WHERE user_id = ?', [(int)$user['id']]);
+    audit('two_factor.disabled', 'user', (int)$user['id']);
+    json_ok();
+}
+
+function totp_regenerate_recovery(): void
+{
+    $user = current_user();
+    if (($user['totp_secret'] ?? null) === null || $user['totp_secret'] === '') {
+        json_err('Two-factor is not enabled on this account.', 409);
+    }
+    // Reissuing recovery material re-checks identity, like disabling.
+    $password = (string)(input()['password'] ?? '');
+    if (!password_verify($password, (string)$user['password_hash'])) {
+        json_err('Your password is not correct.', 422, ['password' => 'Not correct.']);
+    }
+    $codes = totp_store_recovery_codes((int)$user['id']);
+    audit('two_factor.recovery_regenerated', 'user', (int)$user['id']);
+    json_ok(['recovery_codes' => $codes]);
 }
 
 function logout(): void

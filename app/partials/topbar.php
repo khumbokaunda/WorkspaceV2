@@ -53,6 +53,7 @@ $crumbs = $breadcrumbs ?? [($pageTitle ?? 'Home') => null];
             <li><a class="dropdown-item" href="/people/<?= (int)$user['person_id'] ?>"><i class="fa-regular fa-user me-2"></i>My profile</a></li>
 <?php endif; ?>
             <li><a class="dropdown-item" href="/account/password"><i class="fa-solid fa-key me-2"></i>Change password</a></li>
+            <li><a class="dropdown-item" href="/account/two-factor"><i class="fa-solid fa-shield-halved me-2"></i>Two-factor authentication</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
                 <form method="post" action="/logout" class="m-0">

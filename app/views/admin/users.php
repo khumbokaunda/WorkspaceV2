@@ -12,7 +12,7 @@
     </div>
     <div class="mx-card-body mx-flush">
         <table id="mx-user-table" class="table mx-stack align-middle" style="width:100%">
-            <thead><tr><th>Username</th><th>Email</th><th>Person</th><th>Role</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Username</th><th>Email</th><th>Person</th><th>Role</th><th>Two-factor</th><th>Last login</th><th>Status</th><th></th></tr></thead>
             <tbody>
 <?php foreach ($users as $u): ?>
                 <tr>
@@ -20,6 +20,7 @@
                     <td data-label="Email"><?= e($u['email']) ?></td>
                     <td data-label="Person"><?= e($u['first_name'] ? $u['first_name'] . ' ' . $u['last_name'] : '') ?></td>
                     <td data-label="Role"><?= e($u['role_name']) ?></td>
+                    <td data-label="Two-factor"><?php $has2fa = ($u['totp_secret'] ?? null) !== null && $u['totp_secret'] !== ''; ?><span class="mx-chip <?= $has2fa ? 'mx-chip-success' : 'mx-chip-plain' ?>"><?= $has2fa ? 'Enrolled' : 'Off' ?></span></td>
                     <td data-label="Last login" class="mx-tabular"><?= e($u['last_login_at'] ?: 'Never') ?></td>
                     <td data-label="Status"><span class="mx-chip <?= (int)$u['is_active'] === 1 ? 'mx-chip-success' : 'mx-chip-danger' ?>"><?= (int)$u['is_active'] === 1 ? 'Active' : 'Disabled' ?></span></td>
                     <td data-label="">
