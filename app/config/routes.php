@@ -22,8 +22,11 @@ return [
     ['GET',    '/',                           'dashboard@home',             ['auth']],
     ['GET',    '/dashboard',                  'dashboard@index',            ['auth', 'rbac:dashboard.view', 'module:dashboard']],
     ['GET',    '/api/search',                 'search@palette',             ['auth']],
-    ['GET',    '/api/notifications',          'notifications@list_json',    ['auth']],
-    ['POST',   '/api/notifications/read',     'notifications@mark_read',    ['auth', 'csrf']],
+    ['GET',    '/notifications',              'notifications@list_json',    ['auth']],
+    ['GET',    '/notifications/unseen-count', 'notifications@unseen_count',  ['auth']],
+    ['POST',   '/notifications/seen',         'notifications@mark_seen',     ['auth', 'csrf']],
+    ['POST',   '/notifications/read-all',     'notifications@mark_all_read', ['auth', 'csrf']],
+    ['POST',   '/notifications/{id}/read',    'notifications@mark_one_read', ['auth', 'csrf']],
 
     // People
     ['GET',    '/people',                     'people@index',               ['auth', 'rbac:people.view', 'module:people']],

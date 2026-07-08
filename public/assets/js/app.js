@@ -311,30 +311,67 @@
     };
 
     // ------------------------------------------------------ notifications --
+    // Two-state model. seen drives the badge, read drives the highlight.
     MX.notifications = {
-        refresh: function () {
-            fetch('/api/notifications', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
-                .then(function (r) { return r.ok ? r.json() : { items: [], unread: 0 }; })
+        // Badge only: count of unseen rows. Polled and refreshed on load.
+        refreshCount: function () {
+            fetch('/notifications/unseen-count', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : { unseen: 0 }; })
                 .then(function (data) {
                     const badge = document.getElementById('mx-notif-count');
-                    if (badge) {
-                        badge.style.display = data.unread > 0 ? 'flex' : 'none';
-                        badge.textContent = data.unread > 99 ? '99+' : data.unread;
-                    }
-                    const list = document.getElementById('mx-notif-list');
-                    if (!list) return;
+                    if (!badge) return;
+                    const n = data.unseen || 0;
+                    badge.style.display = n > 0 ? 'flex' : 'none';
+                    badge.textContent = n > 99 ? '99+' : n;
+                }).catch(function () { });
+        },
+        // Panel contents. Unread rows carry a tinted background and a marker dot.
+        loadPanel: function () {
+            const list = document.getElementById('mx-notif-list');
+            if (!list) return;
+            fetch('/notifications', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : { items: [] }; })
+                .then(function (data) {
                     if (!data.items.length) {
                         list.innerHTML = '<div class="mx-empty py-4"><i class="fa-regular fa-bell-slash"></i><p class="mb-0">You are all caught up.</p></div>';
                         return;
                     }
                     list.innerHTML = data.items.map(function (n) {
-                        return '<a href="' + MX.escape(n.link || '#') + '" class="mx-notif-item ' + (n.is_read ? '' : 'mx-unread') + '">' +
+                        return '<a href="' + MX.escape(n.link || '#') + '" data-id="' + n.id + '" ' +
+                            'class="mx-notif-item ' + (n.is_read ? '' : 'mx-unread') + '" ' +
+                            'onclick="return MX.notifications.clickItem(event, this, ' + n.id + ')">' +
+                            (n.is_read ? '' : '<span class="mx-notif-dot" aria-label="Unread"></span>') +
                             '<div><div>' + MX.escape(n.body) + '</div><small>' + MX.escape(n.when) + '</small></div></a>';
                     }).join('');
                 }).catch(function () { });
         },
+        // Opening the panel marks everything seen. Clear the badge optimistically,
+        // then tell the server. Seeing is not reading, so the list still shows
+        // any unread rows highlighted.
+        onOpen: function () {
+            const badge = document.getElementById('mx-notif-count');
+            if (badge) badge.style.display = 'none';
+            MX.api('POST', '/notifications/seen', {}).catch(function () { });
+            MX.notifications.loadPanel();
+        },
+        // Clicking an item marks that one read (scoped server-side to the owner),
+        // clears its highlight, then navigates to the linked record.
+        clickItem: function (event, el, id) {
+            event.preventDefault();
+            const href = el.getAttribute('href');
+            el.classList.remove('mx-unread');
+            const dot = el.querySelector('.mx-notif-dot');
+            if (dot) dot.remove();
+            const go = function () { if (href && href !== '#') window.location.href = href; };
+            MX.api('POST', '/notifications/' + id + '/read', {}).then(go).catch(go);
+            return false;
+        },
+        // Mark every unread row read, then repaint the panel.
         markAllRead: function () {
-            MX.api('POST', '/api/notifications/read', {}).then(function () { MX.notifications.refresh(); });
+            MX.api('POST', '/notifications/read-all', {}).then(function () {
+                MX.notifications.loadPanel();
+                MX.notifications.refreshCount();
+            });
         }
     };
 
@@ -405,10 +442,16 @@
             MX.toast(['success', 'error', 'warning', 'info'].includes(type) ? type : 'info', flashEl.dataset.message);
         }
 
-        // Notification bell.
+        // Notification bell. Refresh the badge on load and poll it every 45
+        // seconds so a new arrival brings the badge back. Opening the panel
+        // marks everything seen and clears the badge.
         if (document.getElementById('mx-notif-count')) {
-            MX.notifications.refresh();
-            setInterval(MX.notifications.refresh, 60000);
+            MX.notifications.refreshCount();
+            setInterval(MX.notifications.refreshCount, 45000);
+            const notifDropdown = document.getElementById('mx-notif-dropdown');
+            if (notifDropdown) {
+                notifDropdown.addEventListener('show.bs.dropdown', MX.notifications.onOpen);
+            }
         }
     });
 })();

@@ -27,7 +27,7 @@ $crumbs = $breadcrumbs ?? [($pageTitle ?? 'Home') => null];
     <button type="button" class="mx-icon-btn" onclick="MX.toggleTheme()" aria-label="Toggle theme">
         <i id="mx-theme-icon" class="fa-solid fa-moon"></i>
     </button>
-    <div class="dropdown">
+    <div class="dropdown" id="mx-notif-dropdown">
         <button type="button" class="mx-icon-btn" data-bs-toggle="dropdown" aria-label="Notifications" aria-expanded="false">
             <i class="fa-regular fa-bell"></i>
             <span id="mx-notif-count" class="mx-badge-dot" style="display:none">0</span>

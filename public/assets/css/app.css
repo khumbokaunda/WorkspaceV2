@@ -630,6 +630,12 @@ div.dt-container .dt-paging .dt-paging-button.current:hover {
 .mx-notif-item.mx-unread { background: var(--mx-primary-tint); }
 .mx-notif-item:last-child { border-bottom: 0; }
 .mx-notif-item small { color: var(--mx-muted); }
+.mx-notif-dot {
+    width: 8px; height: 8px; min-width: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: var(--mx-primary);
+}
 
 .dropdown-menu {
     background: var(--mx-surface);

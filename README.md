@@ -59,6 +59,13 @@ config.php       secrets, gitignored, copied from config.example.php
    mysql meridian < database/schema.sql
    ```
 
+   Then apply the numbered migrations in order. They carry additive schema
+   changes that are not in the baseline, so a fresh install needs them too:
+
+   ```
+   for f in database/migrations/*.sql; do mysql meridian < "$f"; done
+   ```
+
 4. Configure:
 
    ```
