@@ -84,7 +84,10 @@
         <div class="mx-card mt-3">
             <div class="mx-card-header">
                 <h2>System check</h2>
-                <button class="btn btn-outline-primary btn-sm" onclick="mxSystemCheck()"><i class="fa-solid fa-stethoscope me-1"></i>Run check</button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="mxTestAssetSave()"><i class="fa-solid fa-vial me-1"></i>Test asset save</button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="mxSystemCheck()"><i class="fa-solid fa-stethoscope me-1"></i>Run check</button>
+                </div>
             </div>
             <div class="mx-card-body" id="mx-syscheck">
                 <p class="text-muted mb-0" style="font-size:13px">Confirms which database this instance writes to, whether writes actually persist, and whether the autocommit fix is present. Use this if a saved record does not appear.</p>
@@ -94,6 +97,34 @@
 </div>
 
 <script>
+// Fires a real save through the same pipeline as the asset form and reports
+// exactly where it succeeds or breaks.
+function mxTestAssetSave() {
+    var box = document.getElementById('mx-syscheck');
+    box.innerHTML = '<span class="mx-skeleton mb-2" style="width:60%"></span>';
+    MX.api('POST', '/api/admin/test-asset', { asset_tag: 'PROBE-UI', name: 'Probe from UI', category: 'Other' })
+        .then(function (d) {
+            function line(label, ok, note) {
+                return '<div class="d-flex justify-content-between py-1 border-bottom" style="font-size:13px">' +
+                    '<span class="text-muted">' + label + '</span>' +
+                    '<span style="color:' + (ok ? 'var(--mx-success)' : 'var(--mx-danger)') + '">' + (ok ? 'yes' : 'no') + (note ? ' (' + MX.escape(note) + ')' : '') + '</span></div>';
+            }
+            box.innerHTML =
+                (d.insert_succeeded
+                    ? '<div class="mx-chip mx-chip-success mb-3">Asset save works end to end</div>'
+                    : '<div class="mx-chip mx-chip-danger mb-3">Asset save failed</div>') +
+                line('Request reached the server', d.reached_server) +
+                line('JSON body parsed (fields arrived)', d.body_parsed) +
+                line('Database insert succeeded', d.insert_succeeded) +
+                (d.insert_error ? '<p class="mt-2" style="color:var(--mx-danger);font-size:12px"><strong>Insert error:</strong> ' + MX.escape(d.insert_error) + '</p>' : '') +
+                '<p class="mt-2 text-muted" style="font-size:12px">If every line is yes, the backend saves correctly and the problem is a stale cached copy of app.js in the browser: hard refresh with Ctrl and F5.</p>';
+        })
+        .catch(function (e) {
+            box.innerHTML = '<div class="mx-chip mx-chip-danger mb-3">Request failed: ' + MX.escape(e.message) + '</div>' +
+                '<p style="font-size:12px">The request did not complete. If this says security token, the page is stale: reload it. Status ' + (e.status || '?') + '.</p>';
+        });
+}
+
 function mxSystemCheck() {
     var box = document.getElementById('mx-syscheck');
     box.innerHTML = '<span class="mx-skeleton mb-2" style="width:70%"></span><span class="mx-skeleton" style="width:50%"></span>';
@@ -121,10 +152,15 @@ function mxSystemCheck() {
                 row('Round-trip write test', c.write_test, writeOk) +
                 row('Assets in this database', c.asset_count) +
                 row('People in this database', c.people_count) +
-                (c.write_error ? '<p class="mt-2" style="color:var(--mx-danger);font-size:12px">Write error: ' + MX.escape(c.write_error) + '</p>' : '') +
+                row('Missing assets columns', c.assets_columns_missing, c.assets_columns_missing === 'none') +
+                (c.write_error ? '<p class="mt-2" style="color:var(--mx-danger);font-size:12px"><strong>Write error:</strong> ' + MX.escape(c.write_error) + '</p>' : '') +
                 (!writeOk && c.autocommit !== '1'
                     ? '<p class="mt-2" style="font-size:12px">Autocommit is off on this server and the fix is ' + (c.has_autocommit_fix ? 'present but not taking effect (restart the web server or clear the PHP opcode cache)' : 'missing (deploy the latest app/bootstrap.php)') + '.</p>'
-                    : '');
+                    : '') +
+                '<details class="mt-2"><summary style="font-size:12px;cursor:pointer;color:var(--mx-muted)">Assets table columns and recent errors</summary>' +
+                '<div class="mx-mono mt-2" style="font-size:11px;white-space:pre-wrap;word-break:break-word">' +
+                'columns: ' + MX.escape(c.assets_columns) + '\n\nrecent log:\n' + MX.escape(c.recent_errors) +
+                '</div></details>';
         })
         .catch(function () { box.innerHTML = '<p style="color:var(--mx-danger)">The check could not run.</p>'; });
 }

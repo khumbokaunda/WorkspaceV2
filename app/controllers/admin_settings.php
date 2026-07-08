@@ -21,14 +21,24 @@ function system_check(): void
         'people_count' => (int)db_val('SELECT COUNT(*) FROM people'),
     ];
 
-    // Round-trip write test on a throwaway tag.
+    // List the assets table columns so a schema that is missing a column
+    // (which would make only the real create path fail) is easy to spot.
+    $columns = array_map(fn($r) => $r['Field'], db_all('SHOW COLUMNS FROM assets'));
+    $info['assets_columns'] = implode(', ', $columns);
+    $expected = ['id', 'asset_tag', 'name', 'category', 'serial_number', 'purchase_date', 'warranty_expiry', 'status', 'note'];
+    $info['assets_columns_missing'] = implode(', ', array_values(array_diff($expected, $columns))) ?: 'none';
+
+    // Write test that mirrors the real asset create exactly: the same seven
+    // columns, with the optional ones NULL, so it fails in the same way the
+    // asset form would rather than passing on a simpler statement.
     $tag = 'SYSCHECK-' . bin2hex(random_bytes(3));
     $persisted = false;
     $writeError = null;
     try {
         db_query(
-            'INSERT INTO assets (asset_tag, name, category, status) VALUES (?,?,?,?)',
-            [$tag, 'System check probe', 'Other', 'Retired']
+            'INSERT INTO assets (asset_tag, name, category, serial_number, purchase_date, warranty_expiry, note)
+             VALUES (?,?,?,?,?,?,?)',
+            [$tag, 'System check probe', 'Other', null, null, null, null]
         );
         $newId = db_insert_id();
         // Read back on a brand new connection so an uncommitted row (the
@@ -49,7 +59,59 @@ function system_check(): void
     }
     $info['write_test'] = $persisted ? 'passed' : 'failed';
     $info['write_error'] = $writeError;
+
+    // Tail of the error log so a recent write failure can be read here
+    // instead of having to open the file on the server.
+    $logFile = APP_ROOT . '/storage/logs/php-error.log';
+    $recent = '';
+    if (is_file($logFile)) {
+        $lines = @file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        $recent = implode("\n", array_slice($lines, -12));
+    }
+    $info['recent_errors'] = $recent !== '' ? $recent : 'none';
+
     json_out(['ok' => true, 'check' => $info]);
+}
+
+// Exercises the full asset-create pipeline the way the form does: it runs
+// through the same CSRF and rbac middleware to reach here, reads the JSON
+// body with input(), then reports what the server received, whether the
+// insert succeeded, and removes the probe row. This isolates a client or
+// body-parsing problem (fields arrive empty) from a database problem.
+function test_asset_save(): void
+{
+    $in = input();
+    $received = [
+        'asset_tag' => (string)($in['asset_tag'] ?? ''),
+        'name'      => (string)($in['name'] ?? ''),
+        'category'  => (string)($in['category'] ?? ''),
+    ];
+    $bodyParsed = $received['asset_tag'] !== '' && $received['name'] !== '';
+
+    $inserted = false;
+    $error = null;
+    $tag = 'PROBE-' . bin2hex(random_bytes(3));
+    try {
+        db_query(
+            'INSERT INTO assets (asset_tag, name, category, serial_number, purchase_date, warranty_expiry, note)
+             VALUES (?,?,?,?,?,?,?)',
+            [$tag, 'Probe from test button', 'Other', null, null, null, null]
+        );
+        $id = db_insert_id();
+        $inserted = $id > 0 && (bool)db_val('SELECT id FROM assets WHERE id = ?', [$id]);
+        db_query('DELETE FROM assets WHERE asset_tag = ?', [$tag]);
+    } catch (Throwable $ex) {
+        $error = $ex->getMessage();
+    }
+
+    json_out([
+        'ok' => true,
+        'reached_server'   => true,
+        'body_parsed'      => $bodyParsed,
+        'received'         => $received,
+        'insert_succeeded' => $inserted,
+        'insert_error'     => $error,
+    ]);
 }
 
 function index(): void

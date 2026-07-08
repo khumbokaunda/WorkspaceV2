@@ -106,4 +106,5 @@ return [
     ['POST',   '/admin/settings',             'admin_settings@save',        ['auth', 'csrf', 'rbac:admin.settings']],
     ['POST',   '/admin/settings/leave-types', 'admin_settings@save_leave_type', ['auth', 'csrf', 'rbac:admin.settings']],
     ['GET',    '/api/admin/system-check',     'admin_settings@system_check',    ['auth', 'rbac:admin.settings']],
+    ['POST',   '/api/admin/test-asset',       'admin_settings@test_asset_save', ['auth', 'csrf', 'rbac:admin.settings']],
 ];
