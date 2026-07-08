@@ -18,4 +18,4 @@
 <link href="/assets/vendor/css/bootstrap.min.css" rel="stylesheet">
 <link href="/assets/vendor/css/fontawesome.min.css" rel="stylesheet">
 <link href="/assets/vendor/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-<link href="/assets/css/app.css" rel="stylesheet">
+<link href="<?= e(asset_url('/assets/css/app.css')) ?>" rel="stylesheet">

@@ -6,4 +6,4 @@
 <script src="/assets/vendor/js/parsley.min.js"></script>
 <script src="/assets/vendor/js/purify.min.js"></script>
 <script src="/assets/vendor/js/sweetalert2.all.min.js"></script>
-<script src="/assets/js/app.js"></script>
+<script src="<?= e(asset_url('/assets/js/app.js')) ?>"></script>

@@ -90,6 +90,16 @@ function e($value): string
     return htmlspecialchars((string)($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+// Append a version stamp to a local asset URL based on the file's last
+// modified time, so browsers fetch a fresh copy whenever the file changes
+// and never serve a stale cached script or stylesheet after a deploy.
+function asset_url(string $path): string
+{
+    $full = APP_ROOT . '/public' . $path;
+    $version = is_file($full) ? filemtime($full) : time();
+    return $path . '?v=' . $version;
+}
+
 function json_out($data, int $status = 200): never
 {
     http_response_code($status);
@@ -136,6 +146,15 @@ function flash(?string $type = null, ?string $message = null): ?array
 // (login and other unauthenticated pages).
 function render(string $view, array $data = [], bool $layout = true): never
 {
+    // HTML pages carry a per-session CSRF token and live data, so they must
+    // never be served from the browser or a proxy cache. A cached page would
+    // submit a stale token and every write would be rejected as a security
+    // token mismatch. These headers force a fresh page and a fresh token on
+    // every visit.
+    if (!headers_sent()) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+    }
     extract($data, EXTR_SKIP);
     $viewFile = APP_ROOT . '/app/views/' . $view . '.php';
     if (!is_file($viewFile)) {
