@@ -235,6 +235,18 @@
         });
     };
 
+    // Format a Date as a local YYYY-MM-DD string. Never use toISOString for
+    // calendar keys: it converts to UTC, which shifts the day for any viewer
+    // whose timezone is ahead of or behind UTC. These read the local
+    // calendar components directly, so the date shown always matches the date
+    // the user picked.
+    MX.isoDate = function (d) {
+        return d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    };
+    MX.today = function () { return MX.isoDate(new Date()); };
+
     // ----------------------------------------------------------- tables --
     // Standard DataTable init: our toolbar handles search, so the built-in
     // filter box is hidden and wired to our input.

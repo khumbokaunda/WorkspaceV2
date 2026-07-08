@@ -101,7 +101,7 @@ function mxRequestLeave() {
         '<div class="mb-3"><label class="form-label">Type</label><select class="form-select" name="leave_type_id" id="lv-type">' +
         mxLeaveTypes.map(function (t) { return '<option value="' + t.id + '">' + MX.escape(t.name) + '</option>'; }).join('') +
         '</select></div>' +
-        '<div class="row g-2 mb-2"><div class="col"><label class="form-label">First day</label><input type="date" class="form-control" name="start_date" id="lv-start" required min="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+        '<div class="row g-2 mb-2"><div class="col"><label class="form-label">First day</label><input type="date" class="form-control" name="start_date" id="lv-start" required min="' + MX.today() + '"></div>' +
         '<div class="col"><label class="form-label">Last day</label><input type="date" class="form-control" name="end_date" id="lv-end" required></div></div>' +
         '<p class="text-muted mb-3" style="font-size:12px" id="lv-balance">Remaining balance loads when you pick a type.</p>' +
         '<div class="mb-3"><label class="form-label">Reason</label><textarea class="form-control" name="reason" rows="2" maxlength="500"></textarea></div>' +
@@ -183,7 +183,7 @@ function mxLoadLeaveCal() {
     var first = mxLcalMonth + '-01';
     var d = new Date(first + 'T00:00:00');
     var last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    var lastIso = last.toISOString().slice(0, 10);
+    var lastIso = MX.isoDate(last);
     document.getElementById('mx-lcal-label').textContent = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     fetch('/api/leave/calendar?from=' + first + '&to=' + lastIso, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
         .then(function (r) { return r.json(); })
@@ -195,7 +195,7 @@ function mxLoadLeaveCal() {
                 var cur = new Date(s + 'T00:00:00');
                 var end = new Date(e + 'T00:00:00');
                 while (cur <= end) {
-                    var iso = cur.toISOString().slice(0, 10);
+                    var iso = MX.isoDate(cur);
                     (byDay[iso] = byDay[iso] || []).push(i);
                     cur.setDate(cur.getDate() + 1);
                 }
@@ -203,7 +203,7 @@ function mxLoadLeaveCal() {
             var lead = (d.getDay() + 6) % 7;
             var html = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(function (x) { return '<div class="mx-cal-head">' + x + '</div>'; }).join('');
             for (var i = 0; i < lead; i++) html += '<div></div>';
-            var today = new Date().toISOString().slice(0, 10);
+            var today = MX.today();
             for (var day = 1; day <= last.getDate(); day++) {
                 var iso = mxLcalMonth + '-' + String(day).padStart(2, '0');
                 var who = byDay[iso] || [];
@@ -231,7 +231,7 @@ function mxLoadRequests(scope) {
             var rows = data.requests.map(function (r) {
                 var chip = { Approved: 'mx-chip-success', Pending: 'mx-chip-warning', Rejected: 'mx-chip-danger', Cancelled: 'mx-chip-plain' }[r.status];
                 var actions = '';
-                if (r.person_id == mxMyPersonId && (r.status === 'Pending' || (r.status === 'Approved' && r.start_date > new Date().toISOString().slice(0, 10)))) {
+                if (r.person_id == mxMyPersonId && (r.status === 'Pending' || (r.status === 'Approved' && r.start_date > MX.today()))) {
                     actions = '<button class="btn btn-subtle btn-sm" onclick="mxCancelLeave(' + r.id + ')" aria-label="Cancel request"><i class="fa-regular fa-circle-xmark"></i></button>';
                 }
                 return [

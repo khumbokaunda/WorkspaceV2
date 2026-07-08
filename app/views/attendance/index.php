@@ -106,7 +106,7 @@ function mxLoadHeatmap() {
                 first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
             var daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
             var lead = (first.getDay() + 6) % 7;
-            var today = new Date().toISOString().slice(0, 10);
+            var today = MX.today();
             var html = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(function (d) { return '<div class="mx-cal-head">' + d + '</div>'; }).join('');
             for (var i = 0; i < lead; i++) html += '<div></div>';
             for (var d = 1; d <= daysInMonth; d++) {

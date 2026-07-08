@@ -54,7 +54,7 @@ var mxCanComment = <?= $canComment ? 'true' : 'false' ?>;
 var mxCanCreateTask = <?= $canCreateTask ? 'true' : 'false' ?>;
 var mxTasks = [];
 var mxToday = '';
-var mxTaskCalMonth = new Date().toISOString().slice(0, 7);
+var mxTaskCalMonth = MX.today().slice(0, 7);
 var TASK_STATUSES = ['To Do', 'In Progress', 'Blocked', 'Done'];
 
 function mxPrioChip(p) {
