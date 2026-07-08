@@ -39,13 +39,30 @@
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept': 'application/json'
             },
-            body: body === undefined ? undefined : JSON.stringify(body)
+            body: body === undefined ? undefined : JSON.stringify(body),
+            // Do not silently follow redirects: a server that 301s a write
+            // (for example Apache redirecting POST /assets to /assets/) would
+            // turn it into a GET and drop the body, and the redirected page
+            // would look like a success. Surface it as an error instead.
+            redirect: 'manual'
         }).then(async function (res) {
-            let data = {};
-            try { data = await res.json(); } catch (e) { /* non JSON error page */ }
-            if (!res.ok || data.ok === false) {
-                const err = new Error(data.error || ('Request failed (' + res.status + ')'));
-                err.fields = data.fields || {};
+            if (res.type === 'opaqueredirect' || res.redirected || (res.status >= 300 && res.status < 400)) {
+                const err = new Error('The request was redirected by the server, so it did not save. This is usually a web server rewrite issue. Reload the page and try again.');
+                err.status = res.status;
+                throw err;
+            }
+            let data = null;
+            const text = await res.text();
+            try { data = JSON.parse(text); } catch (e) { /* not JSON */ }
+            // A write must return a JSON object. A non JSON body (an HTML page
+            // or a redirect target) means the request never reached the
+            // controller, so it must not be reported as success.
+            if (!res.ok || !data || data.ok === false) {
+                const err = new Error(
+                    (data && data.error) ||
+                    (data ? ('Request failed (' + res.status + ')') : 'The server returned an unexpected response. Your page may be out of date; reload it and try again.')
+                );
+                err.fields = (data && data.fields) || {};
                 err.status = res.status;
                 throw err;
             }

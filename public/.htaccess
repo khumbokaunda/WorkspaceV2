@@ -1,9 +1,18 @@
 Options -Indexes
 
+# Do not let mod_dir redirect a URL that happens to match a real directory
+# (for example /assets, which matches the public/assets folder) to a
+# trailing-slash URL. That redirect is a 301, and a 301 turns a POST into a
+# GET and drops its body, so POST /assets would never reach the controller.
+# With this off, /assets is routed through the front controller like any
+# other path, while real files under /assets/ are still served directly.
+DirectorySlash Off
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # Serve real files under assets/ directly, route everything else
-    # through the front controller.
+    # Serve real files (css, js, images) directly; route everything else,
+    # including paths that match a directory name such as /assets, through
+    # the front controller.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
