@@ -18,6 +18,7 @@ return [
 
     // Navigation: Sales
     'clients'        => ['nav' => true,  'section' => 'Sales',  'label' => 'Clients',                'icon' => 'fa-handshake',       'path' => '/clients',        'permission' => 'clients.view'],
+    'tenders'        => ['nav' => true,  'section' => 'Sales',  'label' => 'Tenders',                'icon' => 'fa-file-signature',  'path' => '/tenders',        'permission' => 'tenders.view'],
 
     // Navigation: Company
     'company_docs'   => ['nav' => true,  'section' => 'Company','label' => 'Compliance Library',     'icon' => 'fa-folder-tree',     'path' => '/company/documents', 'permission' => 'company_docs.view'],
@@ -44,4 +45,5 @@ return [
     'widget.task_throughput'   => ['nav' => false, 'label' => 'Task throughput',        'permission' => 'projects.view'],
     'widget.asset_utilization' => ['nav' => false, 'label' => 'Asset utilization',      'permission' => 'assets.view'],
     'widget.compliance_expiry' => ['nav' => false, 'label' => 'Compliance documents',   'permission' => 'company_docs.view'],
+    'widget.tender_deadlines'  => ['nav' => false, 'label' => 'Tender deadlines',        'permission' => 'tenders.view'],
 ];

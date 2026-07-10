@@ -39,6 +39,9 @@ function mx_task_chip(string $priority): string
 <?php if (isset($o['compliance_expiring'])): ?>
     <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-warning)"><?= (int)$o['compliance_expiring'] ?></span><span class="mx-stat-label">Compliance docs ending in 60 days</span></div></div></div>
 <?php endif; ?>
+<?php if (isset($o['open_tenders'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-info)"><?= (int)$o['open_tenders'] ?></span><span class="mx-stat-label">Open tenders</span></div></div></div>
+<?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -186,6 +189,31 @@ function mx_task_chip(string $priority): string
                         <div class="flex-grow-1 text-truncate" style="font-size:13px"><?= e($c['label']) ?></div>
                         <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 30 ? 'mx-chip-warning' : 'mx-chip-info') ?>">
                             <?= $days < 0 ? 'Expired' : $days . ' days' ?>
+                        </span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if (isset($widgets['tender_deadlines'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Tender deadlines</h2><a href="/tenders" class="btn btn-subtle btn-sm">Pipeline</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['tender_deadlines']): ?>
+                <div class="mx-empty"><i class="fa-solid fa-file-signature"></i><p class="mb-0">No closings or securities due soon.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['tender_deadlines'] as $d): $days = (int)$d['days_left']; ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <span class="mx-chip mx-chip-plain"><?= e($d['kind']) ?></span>
+                        <div class="flex-grow-1 text-truncate" style="font-size:13px"><?= e($d['label']) ?></div>
+                        <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 3 ? 'mx-chip-warning' : 'mx-chip-info') ?>">
+                            <?= $days < 0 ? 'Overdue' : ($days === 0 ? 'Today' : $days . ' days') ?>
                         </span>
                     </li>
 <?php endforeach; ?>

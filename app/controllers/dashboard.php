@@ -79,6 +79,29 @@ function index(): void
         $widgets['compliance_expiry'] = array_slice($items, 0, 6);
     }
 
+    if (module_visible('widget.tender_deadlines') && module_enabled('tenders')) {
+        // Open tenders closing soon and bid securities lapsing soon. Missing a
+        // closing date loses the bid, and a lapsed bid security ties up money
+        // or invalidates a submission, so both surface here.
+        $closing = db_all(
+            "SELECT title AS label, 'Closing' AS kind, closing_date AS due,
+                    DATEDIFF(closing_date, CURDATE()) AS days_left
+             FROM tenders
+             WHERE status NOT IN ('Won','Lost','Cancelled') AND closing_date IS NOT NULL
+               AND closing_date <= DATE_ADD(NOW(), INTERVAL 14 DAY)"
+        );
+        $secs = db_all(
+            "SELECT CONCAT(security_type, ' - ', COALESCE(reference,'')) AS label, 'Security' AS kind, expiry_date AS due,
+                    DATEDIFF(expiry_date, CURDATE()) AS days_left
+             FROM tender_securities
+             WHERE status = 'Active' AND expiry_date IS NOT NULL
+               AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)"
+        );
+        $items = array_merge($closing, $secs);
+        usort($items, fn($a, $b) => (int)$a['days_left'] <=> (int)$b['days_left']);
+        $widgets['tender_deadlines'] = array_slice($items, 0, 6);
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,
@@ -127,6 +150,11 @@ function index(): void
             $overview['compliance_expiring'] = (int)db_val(
                 "SELECT COUNT(*) FROM company_documents
                  WHERE expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)"
+            );
+        }
+        if (module_enabled('tenders')) {
+            $overview['open_tenders'] = (int)db_val(
+                "SELECT COUNT(*) FROM tenders WHERE status NOT IN ('Won','Lost','Cancelled')"
             );
         }
         $widgets['org_overview'] = $overview;

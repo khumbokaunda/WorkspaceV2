@@ -19,6 +19,7 @@ function setup_optional_modules(): array
         'company_docs'   => 'A compliance library of company documents and references with expiry tracking.',
         'clients'        => 'A register of clients and procuring entities with an opportunity pipeline.',
         'suppliers'      => 'A register of suppliers, manufacturers and their authorizations.',
+        'tenders'        => 'The full tender response life, assembled from the library, with a compliance matrix, pricing and outcomes.',
     ];
 }
 
