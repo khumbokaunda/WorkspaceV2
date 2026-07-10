@@ -114,6 +114,77 @@ function test_asset_save(): void
     ]);
 }
 
+// Module enablement management. Optional modules can be turned on or off for
+// the instance; core modules are always on and cannot be changed here.
+function modules(): void
+{
+    $rows = db_all('SELECT module_key, is_enabled, is_core FROM modules ORDER BY is_core DESC, module_key');
+    $catalog = module_catalog();
+    $modules = [];
+    foreach ($rows as $r) {
+        $meta = $catalog[$r['module_key']] ?? [];
+        $modules[] = [
+            'key' => $r['module_key'],
+            'label' => $meta['label'] ?? ucwords(str_replace('_', ' ', $r['module_key'])),
+            'is_enabled' => (int)$r['is_enabled'],
+            'is_core' => (int)$r['is_core'],
+        ];
+    }
+    render('admin/modules', [
+        'pageTitle' => 'Modules',
+        'breadcrumbs' => ['Admin' => null, 'Settings' => '/admin/settings', 'Modules' => null],
+        'modules' => $modules,
+    ]);
+}
+
+function save_modules(): void
+{
+    $in = input();
+    $selected = is_array($in['modules'] ?? null) ? array_map('strval', $in['modules']) : [];
+    $optional = db_all('SELECT module_key FROM modules WHERE is_core = 0');
+    foreach ($optional as $m) {
+        $key = $m['module_key'];
+        db_query(
+            'UPDATE modules SET is_enabled = ? WHERE module_key = ? AND is_core = 0',
+            [in_array($key, $selected, true) ? 1 : 0, $key]
+        );
+    }
+    audit('modules.update', 'modules', null, ['enabled' => array_values(array_intersect($selected, array_column($optional, 'module_key')))]);
+    json_ok();
+}
+
+// About and licensing. The license key is a record of who the instance
+// belongs to and what was purchased, shown here. It is a soft record, not
+// copy protection; commercial terms live in the sales contract.
+function about(): void
+{
+    $settings = [];
+    foreach (db_all('SELECT setting_key, value FROM settings') as $row) {
+        $settings[$row['setting_key']] = $row['value'];
+    }
+    render('admin/about', [
+        'pageTitle' => 'About and licensing',
+        'breadcrumbs' => ['Admin' => null, 'Settings' => '/admin/settings', 'About' => null],
+        'settings' => $settings,
+        'enabledModules' => db_all('SELECT module_key FROM modules WHERE is_enabled = 1 ORDER BY module_key'),
+        'version' => 'WorkspaceV2',
+    ]);
+}
+
+function save_license(): void
+{
+    $key = in_str('license_key');
+    if (mb_strlen($key) > 255) {
+        json_err('That license key is too long.', 422, ['license_key' => 'Too long.']);
+    }
+    db_query(
+        'INSERT INTO settings (setting_key, value) VALUES (?,?) ON DUPLICATE KEY UPDATE value = VALUES(value)',
+        ['license_key', $key]
+    );
+    audit('license.update', 'settings', null);
+    json_ok();
+}
+
 function index(): void
 {
     $settings = [];

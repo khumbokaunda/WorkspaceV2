@@ -7,6 +7,10 @@
 // {id} matches digits, {token} matches url-safe base64.
 
 return [
+    // First-run setup (reachable only until setup is completed)
+    ['GET',    '/setup',                      'setup@index',                []],
+    ['POST',   '/setup',                      'setup@submit',               ['csrf']],
+
     // Auth
     ['GET',    '/login',                      'auth@login_form',            []],
     ['POST',   '/login',                      'auth@login_submit',          ['throttle']],
@@ -116,6 +120,10 @@ return [
     ['GET',    '/admin/settings',             'admin_settings@index',       ['auth', 'rbac:admin.settings', 'module:admin_settings']],
     ['POST',   '/admin/settings',             'admin_settings@save',        ['auth', 'csrf', 'rbac:admin.settings']],
     ['POST',   '/admin/settings/leave-types', 'admin_settings@save_leave_type', ['auth', 'csrf', 'rbac:admin.settings']],
+    ['GET',    '/admin/modules',              'admin_settings@modules',         ['auth', 'rbac:admin.settings', 'module:admin_settings']],
+    ['POST',   '/admin/modules',              'admin_settings@save_modules',    ['auth', 'csrf', 'rbac:admin.settings']],
+    ['GET',    '/admin/about',                'admin_settings@about',           ['auth', 'rbac:admin.settings', 'module:admin_settings']],
+    ['POST',   '/admin/about/license',        'admin_settings@save_license',    ['auth', 'csrf', 'rbac:admin.settings']],
     ['GET',    '/api/admin/system-check',     'admin_settings@system_check',    ['auth', 'rbac:admin.settings']],
     ['POST',   '/api/admin/test-asset',       'admin_settings@test_asset_save', ['auth', 'csrf', 'rbac:admin.settings']],
 ];

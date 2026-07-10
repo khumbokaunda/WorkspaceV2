@@ -23,11 +23,19 @@ function mx_task_chip(string $priority): string
 
 <?php if (isset($widgets['org_overview'])): $o = $widgets['org_overview']; ?>
 <div class="row g-3 mb-3">
-    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value"><?= $o['headcount'] ?></span><span class="mx-stat-label">Active headcount</span></div></div></div>
-    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-success)"><?= $o['present'] ?></span><span class="mx-stat-label">Present today</span></div></div></div>
-    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-info)"><?= $o['on_leave'] ?></span><span class="mx-stat-label">On leave today</span></div></div></div>
-    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-warning)"><?= $o['cert_expiring'] ?></span><span class="mx-stat-label">Certs expiring in 90 days</span></div></div></div>
-    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-danger)"><?= $o['warranty_expiring'] ?></span><span class="mx-stat-label">Warranties ending in 60 days</span></div></div></div>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value"><?= (int)$o['headcount'] ?></span><span class="mx-stat-label">Active headcount</span></div></div></div>
+<?php if (isset($o['present'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-success)"><?= (int)$o['present'] ?></span><span class="mx-stat-label">Present today</span></div></div></div>
+<?php endif; ?>
+<?php if (isset($o['on_leave'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-info)"><?= (int)$o['on_leave'] ?></span><span class="mx-stat-label">On leave today</span></div></div></div>
+<?php endif; ?>
+<?php if (isset($o['cert_expiring'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-warning)"><?= (int)$o['cert_expiring'] ?></span><span class="mx-stat-label">Certs expiring in 90 days</span></div></div></div>
+<?php endif; ?>
+<?php if (isset($o['warranty_expiring'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-danger)"><?= (int)$o['warranty_expiring'] ?></span><span class="mx-stat-label">Warranties ending in 60 days</span></div></div></div>
+<?php endif; ?>
 </div>
 <?php endif; ?>
 

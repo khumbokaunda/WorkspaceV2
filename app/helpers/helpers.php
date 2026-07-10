@@ -369,8 +369,49 @@ function module_catalog(): array
     return $catalog ??= require APP_ROOT . '/app/config/modules.php';
 }
 
-// Effective visibility: role default row, overridden by a per-user row.
-// A module with no row at all defaults to visible (permission still gates it).
+// Instance-level module enablement (the modules table). This is the hard gate
+// that sits above role and per-user visibility: a disabled module does not
+// exist for anyone. A key that is not in the table (dashboard widgets, for
+// example) defaults to enabled, since only navigation modules are gated here.
+function module_enabled(string $moduleKey): bool
+{
+    static $map = null;
+    if ($map === null) {
+        $map = [];
+        foreach (db_all('SELECT module_key, is_enabled FROM modules') as $row) {
+            $map[$row['module_key']] = (bool)$row['is_enabled'];
+        }
+    }
+    return $map[$moduleKey] ?? true;
+}
+
+// Map a permission key to the optional module it belongs to, so a route with
+// only an rbac permission can still be gated by instance enablement. Returns
+// null for permissions that belong to a core module (always enabled) so no
+// gate is injected for them.
+function module_for_permission(string $permissionKey): ?string
+{
+    static $map = [
+        'attendance'     => 'attendance',
+        'leave'          => 'leave',
+        'projects'       => 'projects',
+        'tasks'          => 'projects',
+        'assets'         => 'assets',
+        'certifications' => 'certifications',
+    ];
+    $prefix = explode('.', $permissionKey, 2)[0];
+    return $map[$prefix] ?? null;
+}
+
+// Whether first-run setup has been completed.
+function setup_completed(): bool
+{
+    return setting('setup_completed', '0') === '1';
+}
+
+// Effective visibility: instance enablement first, then role default row,
+// overridden by a per-user row. A module with no visibility row defaults to
+// visible (permission still gates it), but a disabled module never appears.
 function visible_modules(?array $user = null): array
 {
     static $cache = [];
@@ -397,6 +438,9 @@ function visible_modules(?array $user = null): array
     }
     $result = [];
     foreach (module_catalog() as $key => $meta) {
+        if (!module_enabled($key)) {
+            continue; // instance gate: disabled modules do not exist for anyone
+        }
         $visible = $vis[$key] ?? true;
         $permitted = empty($meta['permission']) || user_can($meta['permission'], $user);
         if ($visible && $permitted) {

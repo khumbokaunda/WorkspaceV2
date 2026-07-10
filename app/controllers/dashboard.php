@@ -17,14 +17,14 @@ function index(): void
     $today = date('Y-m-d');
     $widgets = [];
 
-    if (module_visible('widget.attendance') && $personId) {
+    if (module_visible('widget.attendance') && module_enabled('attendance') && $personId) {
         $widgets['attendance'] = db_row(
             'SELECT * FROM attendance WHERE person_id = ? AND work_date = ?',
             [$personId, $today]
         );
     }
 
-    if (module_visible('widget.my_tasks') && $personId) {
+    if (module_visible('widget.my_tasks') && module_enabled('projects') && $personId) {
         $widgets['my_tasks'] = db_all(
             "SELECT t.id, t.title, t.priority, t.status, t.due_date, p.name AS project_name
              FROM tasks t LEFT JOIN projects p ON p.id = t.project_id
@@ -34,7 +34,7 @@ function index(): void
         );
     }
 
-    if (module_visible('widget.my_leave') && $personId) {
+    if (module_visible('widget.my_leave') && module_enabled('leave') && $personId) {
         $widgets['my_leave'] = db_all(
             "SELECT lr.*, lt.name AS type_name FROM leave_requests lr
              JOIN leave_types lt ON lt.id = lr.leave_type_id
@@ -44,7 +44,7 @@ function index(): void
         );
     }
 
-    if (module_visible('widget.cert_expiry') && $personId) {
+    if (module_visible('widget.cert_expiry') && module_enabled('certifications') && $personId) {
         $widgets['cert_expiry'] = db_all(
             "SELECT id, name, code, expires_on, DATEDIFF(expires_on, CURDATE()) AS days_left
              FROM certifications
@@ -55,7 +55,7 @@ function index(): void
         );
     }
 
-    if (module_visible('widget.approvals')) {
+    if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,
                     p.first_name, p.last_name
@@ -68,30 +68,41 @@ function index(): void
     }
 
     if (module_visible('widget.org_overview')) {
-        $widgets['org_overview'] = [
+        // Each figure is computed only when its module is enabled, so a
+        // disabled module's tables are never queried and its tile is omitted.
+        $overview = [
             'headcount' => (int)db_val("SELECT COUNT(*) FROM people WHERE employment_status = 'Active'"),
-            'present'   => (int)db_val(
+        ];
+        if (module_enabled('attendance')) {
+            $overview['present'] = (int)db_val(
                 "SELECT COUNT(*) FROM attendance WHERE work_date = ? AND check_in IS NOT NULL", [$today]
-            ),
-            'on_leave'  => (int)db_val(
+            );
+        }
+        if (module_enabled('leave')) {
+            $overview['on_leave'] = (int)db_val(
                 "SELECT COUNT(DISTINCT person_id) FROM leave_requests
                  WHERE status = 'Approved' AND start_date <= ? AND end_date >= ?", [$today, $today]
-            ),
-            'cert_expiring' => (int)db_val(
+            );
+        }
+        if (module_enabled('certifications')) {
+            $overview['cert_expiring'] = (int)db_val(
                 "SELECT COUNT(*) FROM certifications c
                  JOIN people pe ON pe.id = c.person_id AND pe.employment_status = 'Active'
                  WHERE c.expires_on IS NOT NULL AND c.expires_on <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)
                    AND c.expires_on >= CURDATE()"
-            ),
-            'warranty_expiring' => (int)db_val(
+            );
+        }
+        if (module_enabled('assets')) {
+            $overview['warranty_expiring'] = (int)db_val(
                 "SELECT COUNT(*) FROM assets
                  WHERE warranty_expiry IS NOT NULL AND status <> 'Retired'
                    AND warranty_expiry <= DATE_ADD(CURDATE(), INTERVAL 60 DAY) AND warranty_expiry >= CURDATE()"
-            ),
-        ];
+            );
+        }
+        $widgets['org_overview'] = $overview;
     }
 
-    if (module_visible('widget.task_throughput')) {
+    if (module_visible('widget.task_throughput') && module_enabled('projects')) {
         $counts = ['To Do' => 0, 'In Progress' => 0, 'Blocked' => 0, 'Done' => 0];
         foreach (db_all('SELECT status, COUNT(*) AS c FROM tasks GROUP BY status') as $row) {
             $counts[$row['status']] = (int)$row['c'];
@@ -99,7 +110,7 @@ function index(): void
         $widgets['task_throughput'] = $counts;
     }
 
-    if (module_visible('widget.asset_utilization')) {
+    if (module_visible('widget.asset_utilization') && module_enabled('assets')) {
         $counts = ['Available' => 0, 'Assigned' => 0, 'In Repair' => 0, 'Retired' => 0];
         foreach (db_all('SELECT status, COUNT(*) AS c FROM assets GROUP BY status') as $row) {
             $counts[$row['status']] = (int)$row['c'];

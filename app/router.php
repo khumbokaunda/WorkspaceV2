@@ -18,6 +18,17 @@ function route_dispatch(): void
         }
     }
 
+    // First-run setup guard. Until the install is configured, every request
+    // except the setup routes is sent to the wizard. Static assets are served
+    // by the web server and do not reach here.
+    if (!setup_completed() && !str_starts_with($path, '/setup')) {
+        redirect('/setup');
+    }
+    // Once setup is done, the wizard is no longer reachable.
+    if (setup_completed() && str_starts_with($path, '/setup')) {
+        redirect(current_user() ? '/dashboard' : '/login');
+    }
+
     $routes = require APP_ROOT . '/app/config/routes.php';
     $pathMatched = false;
 
@@ -35,6 +46,29 @@ function route_dispatch(): void
         }
 
         $params = array_slice($matches, 1);
+
+        // Instance enablement is the hard gate, checked before anything else.
+        // Derive the optional module from a module:<key> entry or from an rbac
+        // permission, and inject module_enabled:<key> at the front so a
+        // disabled module returns not found regardless of auth or role.
+        $enabledKey = null;
+        foreach ($middleware as $mw) {
+            [$mwName, $mwArg] = array_pad(explode(':', $mw, 2), 2, null);
+            if ($mwName === 'module' && $mwArg) {
+                $enabledKey = $mwArg;
+                break;
+            }
+            if ($mwName === 'rbac' && $mwArg) {
+                $mapped = module_for_permission($mwArg);
+                if ($mapped) {
+                    $enabledKey = $mapped;
+                    break;
+                }
+            }
+        }
+        if ($enabledKey !== null && !in_array('module_enabled:' . $enabledKey, $middleware, true)) {
+            array_unshift($middleware, 'module_enabled:' . $enabledKey);
+        }
 
         // Every authenticated route also enforces the two-factor requirement
         // for admins. The totp middleware whitelists the enrolment routes and
