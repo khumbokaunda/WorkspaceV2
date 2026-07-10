@@ -104,6 +104,9 @@ return [
     ['POST',   '/certifications',             'certifications@create',      ['auth', 'csrf', 'rbac:certifications.manage_own']],
     ['PATCH',  '/certifications/{id}',        'certifications@update',      ['auth', 'csrf', 'rbac:certifications.manage_own']],
     ['DELETE', '/certifications/{id}',        'certifications@destroy',     ['auth', 'csrf', 'rbac:certifications.manage_own']],
+    ['POST',   '/certifications/{id}/file',   'certifications@attach_file',  ['auth', 'csrf', 'rbac:certifications.manage_own']],
+    ['POST',   '/certifications/{id}/file-link', 'certifications@file_link', ['auth', 'csrf', 'rbac:certifications.view']],
+    ['GET',    '/certifications/file/{token}','certifications@download_file',['auth', 'rbac:certifications.view']],
 
     // Company profile and compliance library
     ['GET',    '/company/documents',              'company@library',              ['auth', 'rbac:company_docs.view', 'module:company_docs']],

@@ -72,6 +72,7 @@ function mxRenderCerts() {
         .filter(function (c) { return !mine || c.person_id == mxMyPid; })
         .map(function (c) {
             var canTouch = mxCanManageAllCerts || (mxCanManageOwnCerts && c.person_id == mxMyPid);
+            var canFile = c.has_certificate && (mxCanManageAllCerts || c.person_id == mxMyPid);
             var expiryHtml = '';
             if (c.expires_on) {
                 var color = c.days_left < 0 ? 'var(--mx-danger)' : c.days_left <= 30 ? 'var(--mx-warning)' : 'inherit';
@@ -85,10 +86,11 @@ function mxRenderCerts() {
                 MX.escape(c.issuing_body || ''),
                 expiryHtml,
                 mxCertChip(c.effective_status),
-                canTouch
+                (canFile ? '<button class="btn btn-subtle btn-sm" onclick="mxDownloadCert(' + c.id + ')" aria-label="Download certificate"><i class="fa-solid fa-download"></i></button>' : '') +
+                (canTouch
                     ? '<button class="btn btn-subtle btn-sm" onclick="mxEditCert(' + c.id + ')" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>' +
                       '<button class="btn btn-subtle btn-sm" style="color:var(--mx-danger)" onclick="mxDeleteCert(' + c.id + ')" aria-label="Delete"><i class="fa-regular fa-trash-can"></i></button>'
-                    : ''
+                    : '')
             ];
         });
     if (window.mxCertTable) { window.mxCertTable.clear(); window.mxCertTable.rows.add(rows).draw(); }
@@ -123,6 +125,10 @@ function mxCertForm(c) {
         '<div class="mb-3"><label class="form-label">Status</label><select class="form-select" name="status">' +
         ['In Progress', 'Active', 'Expired'].map(function (s) { return '<option' + ((c.status || 'Active') === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') +
         '</select><div class="form-text">Anything past its expiry date shows as Expired regardless of this value.</div></div>' +
+        '<div class="mb-3"><label class="form-label">Certificate file' + (c.has_certificate ? ' (replace)' : '') + '</label>' +
+        '<input type="file" class="form-control" id="cert-file" accept=".pdf,.png,.jpg,.jpeg">' +
+        '<div class="form-text">PDF, JPG or PNG. Attached as evidence when a tender requires proof of this qualification.' +
+        (c.has_certificate ? ' A file is already attached; choosing a new one replaces it.' : '') + '</div></div>' +
         '</form>';
 }
 
@@ -147,9 +153,33 @@ function mxEditCert(id) {
 function mxSubmitCert(id) {
     var form = document.getElementById('cert-form');
     if (!form.reportValidity()) return;
+    // The file input has no name so it stays out of the JSON metadata; it is
+    // uploaded separately once the record exists, since it needs multipart.
+    var fileInput = document.getElementById('cert-file');
+    var file = fileInput && fileInput.files[0];
     var call = id ? MX.api('PATCH', '/certifications/' + id, MX.formData(form)) : MX.api('POST', '/certifications', MX.formData(form));
-    call.then(function () { MX.drawer.close(); MX.ok(id ? 'Updated.' : 'Added.'); mxLoadCerts(); })
-        .catch(function (e) { MX.fail(e.message); MX.showFieldErrors(form, e.fields); });
+    call.then(function (data) {
+        var certId = id || (data && data.certification_id);
+        if (file && certId) { return mxUploadCertFile(certId, file); }
+    }).then(function () {
+        MX.drawer.close(); MX.ok(id ? 'Updated.' : 'Added.'); mxLoadCerts();
+    }).catch(function (e) { MX.fail(e.message); MX.showFieldErrors(form, e.fields); });
+}
+function mxUploadCertFile(certId, file) {
+    var fd = new FormData();
+    fd.append('file', file);
+    return fetch('/certifications/' + certId + '/file', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': MX.csrf, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: fd, redirect: 'manual'
+    }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok === false) { throw new Error(d.error || 'The certificate file could not be uploaded.'); }
+    });
+}
+function mxDownloadCert(id) {
+    MX.api('POST', '/certifications/' + id + '/file-link', {})
+        .then(function (data) { window.location.href = data.url; })
+        .catch(function (e) { MX.fail(e.message); });
 }
 function mxDeleteCert(id) {
     MX.confirm('Remove this certification?').then(function (go) {

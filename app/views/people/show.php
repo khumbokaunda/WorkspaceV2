@@ -77,7 +77,8 @@ $isSelf = (int)(current_user()['person_id'] ?? 0) === (int)$person['id'];
 <?php else: ?>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Expires</th><th>Status</th></tr></thead>
+<?php $canSeeCertFiles = $isSelf || user_can('certifications.manage_all'); ?>
+                        <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Expires</th><th>Status</th><th></th></tr></thead>
                         <tbody>
 <?php foreach ($certs as $c):
         $chip = match ($c['effective_status']) { 'Active' => 'mx-chip-success', 'In Progress' => 'mx-chip-warning', default => 'mx-chip-danger' }; ?>
@@ -87,6 +88,11 @@ $isSelf = (int)(current_user()['person_id'] ?? 0) === (int)$person['id'];
                                 <td><?= e($c['issuing_body'] ?: '') ?></td>
                                 <td class="mx-tabular"><?= e($c['expires_on'] ?: 'No expiry') ?></td>
                                 <td><span class="mx-chip <?= $chip ?>"><?= e($c['effective_status']) ?></span></td>
+                                <td class="text-end">
+<?php if ($canSeeCertFiles && $c['cert_stored_name']): ?>
+                                    <button class="btn btn-subtle btn-sm" onclick="mxDownloadCertFile(<?= (int)$c['id'] ?>)" aria-label="Download certificate"><i class="fa-solid fa-download"></i></button>
+<?php endif; ?>
+                                </td>
                             </tr>
 <?php endforeach; ?>
                         </tbody>
@@ -248,6 +254,12 @@ function mxSubmitDoc() {
 
 function mxDownloadDoc(id) {
     MX.api('POST', '/documents/' + id + '/link', {})
+        .then(function (data) { window.location.href = data.url; })
+        .catch(function (e) { MX.fail(e.message); });
+}
+
+function mxDownloadCertFile(id) {
+    MX.api('POST', '/certifications/' + id + '/file-link', {})
         .then(function (data) { window.location.href = data.url; })
         .catch(function (e) { MX.fail(e.message); });
 }

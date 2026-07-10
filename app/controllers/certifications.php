@@ -58,6 +58,10 @@ function list_json(): void
         $c['days_left'] = $c['expires_on'] !== null
             ? (int)floor((strtotime($c['expires_on']) - strtotime(date('Y-m-d'))) / 86400)
             : null;
+        // Surface only whether a scanned certificate is attached; the random
+        // stored name and mime are never exposed to the client.
+        $c['has_certificate'] = $c['cert_stored_name'] !== null;
+        unset($c['cert_stored_name'], $c['cert_mime'], $c['cert_size_bytes']);
     }
     json_out(['ok' => true, 'certifications' => $rows]);
 }
@@ -171,6 +175,95 @@ function destroy(string $id): void
         json_err('You may only remove your own certifications.', 403);
     }
     db_query('DELETE FROM certifications WHERE id = ?', [$certId]);
+    if ($cert['cert_stored_name']) {
+        $path = rtrim((string)config('uploads.dir'), '/') . '/' . $cert['cert_stored_name'];
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
     audit('certification.delete', 'certification', $certId, ['code' => $cert['code'], 'person_id' => (int)$cert['person_id']]);
     json_ok();
+}
+
+// A user may download a certificate file when they manage anyone's
+// certifications (managers and the tender module) or when it is their own.
+function certifications_can_view_file(int $personId): bool
+{
+    if (user_can('certifications.manage_all')) {
+        return true;
+    }
+    $me = current_user();
+    return user_can('certifications.view') && (int)($me['person_id'] ?? 0) === $personId;
+}
+
+// Attach or replace the scanned certificate file. Restricted to PDF and
+// images, validated and stored through the shared gated path.
+function attach_file(string $id): void
+{
+    $certId = (int)$id;
+    $cert = db_row('SELECT * FROM certifications WHERE id = ?', [$certId]);
+    if (!$cert) {
+        json_err('That certification does not exist.', 404);
+    }
+    if (!certifications_can_touch((int)$cert['person_id'])) {
+        json_err('You may only attach files to your own certifications.', 403);
+    }
+    if (empty($_FILES['file'])) {
+        json_err('No file received or the upload failed.', 422);
+    }
+    try {
+        $stored = store_upload($_FILES['file'], [
+            'pdf' => ['application/pdf'], 'png' => ['image/png'], 'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'],
+        ]);
+    } catch (RuntimeException $ex) {
+        json_err($ex->getMessage(), 422, ['file' => $ex->getMessage()]);
+    }
+    db_query(
+        'UPDATE certifications SET cert_stored_name = ?, cert_original_name = ?, cert_mime = ?, cert_size_bytes = ? WHERE id = ?',
+        [$stored['stored_name'], $stored['original_name'], $stored['mime'], $stored['size_bytes'], $certId]
+    );
+    // Replace: remove the previous file after the row points at the new one.
+    if ($cert['cert_stored_name']) {
+        $old = rtrim((string)config('uploads.dir'), '/') . '/' . $cert['cert_stored_name'];
+        if (is_file($old)) {
+            unlink($old);
+        }
+    }
+    audit('certification.attach_file', 'certification', $certId, ['code' => $cert['code'], 'person_id' => (int)$cert['person_id']]);
+    json_ok();
+}
+
+function file_link(string $id): void
+{
+    $certId = (int)$id;
+    $cert = db_row('SELECT person_id, cert_stored_name FROM certifications WHERE id = ?', [$certId]);
+    if (!$cert || !$cert['cert_stored_name']) {
+        json_err('That certification has no attached file.', 404);
+    }
+    if (!certifications_can_view_file((int)$cert['person_id'])) {
+        json_err('You do not have permission to download this certificate.', 403);
+    }
+    $token = sign_download($certId, (int)current_user()['id'], 300);
+    json_ok(['url' => '/certifications/file/' . $token, 'expires_in' => 300]);
+}
+
+function download_file(string $token): void
+{
+    $verified = verify_download($token);
+    if (!$verified) {
+        render_error(403, 'Link expired', 'This download link is not valid or has expired. Request a fresh one.');
+    }
+    [$certId, $tokenUserId] = $verified;
+    if ($tokenUserId !== (int)current_user()['id']) {
+        render_error(403, 'Access denied', 'This download link belongs to a different account.');
+    }
+    $cert = db_row('SELECT * FROM certifications WHERE id = ?', [$certId]);
+    if (!$cert || !$cert['cert_stored_name']) {
+        render_error(404, 'Not found', 'That certificate file no longer exists.');
+    }
+    if (!certifications_can_view_file((int)$cert['person_id'])) {
+        render_error(403, 'Access denied', 'You do not have permission to download this certificate.');
+    }
+    audit('certification.download_file', 'certification', $certId, ['code' => $cert['code']]);
+    stream_stored_file($cert['cert_stored_name'], $cert['cert_original_name'], $cert['cert_mime']);
 }
