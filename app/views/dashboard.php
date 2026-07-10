@@ -224,6 +224,31 @@ function mx_task_chip(string $priority): string
     </div>
 <?php endif; ?>
 
+<?php if (isset($widgets['procurement_approvals'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Requisition approvals</h2><a href="/procurement" class="btn btn-subtle btn-sm">Procurement</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['procurement_approvals']): ?>
+                <div class="mx-empty"><i class="fa-regular fa-thumbs-up"></i><p class="mb-0">No requisitions awaiting approval.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['procurement_approvals'] as $rq): ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <div class="flex-grow-1 text-truncate" style="font-size:13px">
+                            <a href="/procurement/requisitions/<?= (int)$rq['id'] ?>" style="color:var(--mx-text)"><?= e($rq['purpose']) ?></a>
+                            <span class="text-muted d-block" style="font-size:11px"><?= e($rq['department'] ?: '') ?></span>
+                        </div>
+                        <span class="mx-tabular" style="font-size:12px"><?= e(setting('currency', 'MWK')) ?> <?= number_format((float)$rq['total_estimate'], 0) ?></span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (isset($widgets['task_throughput'])): $tt = $widgets['task_throughput']; $total = max(1, array_sum($tt)); ?>
     <div class="col-12 col-lg-4">
         <div class="mx-card h-100">

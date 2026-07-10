@@ -25,6 +25,8 @@ return [
 
     // Navigation: Procurement
     'suppliers'      => ['nav' => true,  'section' => 'Procurement', 'label' => 'Suppliers',         'icon' => 'fa-truck-field',     'path' => '/suppliers',      'permission' => 'suppliers.view'],
+    'procurement'    => ['nav' => true,  'section' => 'Procurement', 'label' => 'Procurement',       'icon' => 'fa-cart-flatbed',    'path' => '/procurement',    'permission' => 'procurement.view'],
+    'budgets'        => ['nav' => true,  'section' => 'Procurement', 'label' => 'Budgets',           'icon' => 'fa-money-bill-trend-up', 'path' => '/budgets',    'permission' => 'budgets.view'],
 
     // Navigation: Assets
     'assets'         => ['nav' => true,  'section' => 'Assets', 'label' => 'Asset Register',         'icon' => 'fa-laptop',          'path' => '/assets',         'permission' => 'assets.view'],
@@ -46,4 +48,5 @@ return [
     'widget.asset_utilization' => ['nav' => false, 'label' => 'Asset utilization',      'permission' => 'assets.view'],
     'widget.compliance_expiry' => ['nav' => false, 'label' => 'Compliance documents',   'permission' => 'company_docs.view'],
     'widget.tender_deadlines'  => ['nav' => false, 'label' => 'Tender deadlines',        'permission' => 'tenders.view'],
+    'widget.procurement_approvals' => ['nav' => false, 'label' => 'Requisition approvals', 'permission' => 'procurement.approve'],
 ];

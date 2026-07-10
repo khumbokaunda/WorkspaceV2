@@ -102,6 +102,13 @@ function index(): void
         $widgets['tender_deadlines'] = array_slice($items, 0, 6);
     }
 
+    if (module_visible('widget.procurement_approvals') && module_enabled('procurement')) {
+        $widgets['procurement_approvals'] = db_all(
+            "SELECT rq.id, rq.reference, rq.purpose, rq.total_estimate, rq.department
+             FROM requisitions rq WHERE rq.status = 'Submitted' ORDER BY rq.created_at LIMIT 6"
+        );
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,

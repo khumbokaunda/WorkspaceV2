@@ -183,6 +183,26 @@ return [
     ['POST',   '/suppliers/authorizations/{id}/link', 'suppliers@authorization_link', ['auth', 'csrf', 'rbac:suppliers.view']],
     ['GET',    '/suppliers/authorizations/file/{token}', 'suppliers@download_authorization', ['auth', 'rbac:suppliers.view']],
 
+    // Procurement and office administration
+    ['GET',    '/procurement',                    'procurement@index',            ['auth', 'rbac:procurement.view', 'module:procurement']],
+    ['GET',    '/procurement/requisitions/{id}',  'procurement@requisition',      ['auth', 'rbac:procurement.view', 'module:procurement']],
+    ['GET',    '/procurement/orders/{id}',        'procurement@order',            ['auth', 'rbac:procurement.view', 'module:procurement']],
+    ['POST',   '/procurement/requests',           'procurement@create_request',   ['auth', 'csrf', 'rbac:procurement.request']],
+    ['PATCH',  '/procurement/requests/{id}',      'procurement@update_request',   ['auth', 'csrf', 'rbac:procurement.request']],
+    ['DELETE', '/procurement/requests/{id}',      'procurement@delete_request',   ['auth', 'csrf', 'rbac:procurement.request']],
+    ['POST',   '/procurement/requisitions',       'procurement@create_requisition', ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['POST',   '/procurement/requisitions/{id}/submit',  'procurement@submit_requisition', ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['POST',   '/procurement/requisitions/{id}/decide',  'procurement@decide_requisition', ['auth', 'csrf', 'rbac:procurement.approve']],
+    ['POST',   '/procurement/requisitions/{id}/fund-release', 'procurement@add_fund_release', ['auth', 'csrf', 'rbac:procurement.approve']],
+    ['POST',   '/procurement/orders',             'procurement@create_order',     ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['PATCH',  '/procurement/orders/{id}',        'procurement@update_order',     ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['POST',   '/procurement/orders/{id}/items',  'procurement@add_order_item',   ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['DELETE', '/procurement/order-items/{id}',   'procurement@delete_order_item', ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['POST',   '/procurement/orders/{id}/receipts', 'procurement@add_receipt',    ['auth', 'csrf', 'rbac:procurement.manage']],
+    ['GET',    '/budgets',                        'procurement@budgets',          ['auth', 'rbac:budgets.view', 'module:budgets']],
+    ['POST',   '/budgets',                        'procurement@save_budget',      ['auth', 'csrf', 'rbac:budgets.manage']],
+    ['DELETE', '/budgets/{id}',                   'procurement@delete_budget',    ['auth', 'csrf', 'rbac:budgets.manage']],
+
     // Admin
     ['GET',    '/admin/users',                'admin_users@index',          ['auth', 'rbac:admin.users', 'module:admin_users']],
     ['POST',   '/admin/users',                'admin_users@create',         ['auth', 'csrf', 'rbac:admin.users']],

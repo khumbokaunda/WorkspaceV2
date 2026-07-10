@@ -20,6 +20,8 @@ function setup_optional_modules(): array
         'clients'        => 'A register of clients and procuring entities with an opportunity pipeline.',
         'suppliers'      => 'A register of suppliers, manufacturers and their authorizations.',
         'tenders'        => 'The full tender response life, assembled from the library, with a compliance matrix, pricing and outcomes.',
+        'procurement'    => 'Item requests, consolidated requisitions, approvals and fund release, purchase orders and goods receipt.',
+        'budgets'        => 'Department budgets that requisitions and purchase orders draw against.',
     ];
 }
 

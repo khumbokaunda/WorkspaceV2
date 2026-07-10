@@ -414,6 +414,8 @@ function module_for_permission(string $permissionKey): ?string
         'clients'        => 'clients',
         'suppliers'      => 'suppliers',
         'tenders'        => 'tenders',
+        'procurement'    => 'procurement',
+        'budgets'        => 'budgets',
     ];
     $prefix = explode('.', $permissionKey, 2)[0];
     return $map[$prefix] ?? null;
