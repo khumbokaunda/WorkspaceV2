@@ -280,6 +280,18 @@ function setting(string $key, ?string $default = null): ?string
     return $cache[$key] ?? $default;
 }
 
+// Single-row company profile, the identity the tender module and branding
+// draw from. Loaded once per request. Returns an empty-ish row when the
+// migration has run but the row is somehow absent, so callers never null out.
+function company_profile(): array
+{
+    static $row = null;
+    if ($row === null) {
+        $row = db_row('SELECT * FROM company_profile WHERE id = 1') ?? [];
+    }
+    return $row;
+}
+
 // ---------------------------------------------------------------------------
 // Auth, permissions, module visibility
 // ---------------------------------------------------------------------------
@@ -398,6 +410,9 @@ function module_for_permission(string $permissionKey): ?string
         'tasks'          => 'projects',
         'assets'         => 'assets',
         'certifications' => 'certifications',
+        'company_docs'   => 'company_docs',
+        'clients'        => 'clients',
+        'suppliers'      => 'suppliers',
     ];
     $prefix = explode('.', $permissionKey, 2)[0];
     return $map[$prefix] ?? null;
@@ -615,6 +630,76 @@ function verify_download(string $token): ?array
     return [(int)$docId, (int)$userId];
 }
 
+// Validate and store an uploaded file under a random name in storage/uploads,
+// the same gated path the document vault uses. Validation is by extension,
+// finfo detected MIME, agreement between the two so a renamed file cannot slip
+// through, and size. $allowedExtMime maps an allowed extension to its accepted
+// MIME types; pass a narrower map to restrict a field to, say, PDF and images.
+// Returns [stored_name, original_name, mime, size_bytes]. Throws a
+// RuntimeException carrying a message safe to show the user on any failure.
+function store_upload(array $file, ?array $allowedExtMime = null, ?int $maxBytes = null): array
+{
+    $allowedExtMime = $allowedExtMime ?? [
+        'pdf'  => ['application/pdf'],
+        'doc'  => ['application/msword'],
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        'odt'  => ['application/vnd.oasis.opendocument.text'],
+        'txt'  => ['text/plain'],
+        'png'  => ['image/png'],
+        'jpg'  => ['image/jpeg'],
+        'jpeg' => ['image/jpeg'],
+    ];
+    $maxBytes = $maxBytes ?? (int)config('uploads.max_bytes', 10485760);
+
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('No file received or the upload failed.');
+    }
+    if ($file['size'] > $maxBytes || $file['size'] <= 0) {
+        throw new RuntimeException('The file exceeds the maximum size of ' . round($maxBytes / 1048576) . ' MB.');
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!isset($allowedExtMime[$ext])) {
+        throw new RuntimeException('That file type is not allowed.');
+    }
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']);
+    if (!in_array($mime, $allowedExtMime[$ext], true)) {
+        throw new RuntimeException('The file content does not match its extension.');
+    }
+    $storedName = bin2hex(random_bytes(20)) . '.' . $ext;
+    $dir = rtrim((string)config('uploads.dir'), '/');
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+        throw new RuntimeException('Could not prepare the uploads directory.');
+    }
+    if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $storedName)) {
+        throw new RuntimeException('Could not store the file. Check the uploads directory permissions.');
+    }
+    return [
+        'stored_name'   => $storedName,
+        'original_name' => mb_substr((string)$file['name'], 0, 200),
+        'mime'          => $mime,
+        'size_bytes'    => (int)$file['size'],
+    ];
+}
+
+// Stream a stored file from storage/uploads as a gated download and exit.
+// The permission decision is the caller's; this only serves the bytes once
+// the caller has authorized the request. $storedName and $originalName come
+// from the owning table row.
+function stream_stored_file(string $storedName, string $originalName, string $mime): never
+{
+    $path = rtrim((string)config('uploads.dir'), '/') . '/' . $storedName;
+    if (!is_file($path)) {
+        render_error(404, 'Not found', 'The stored file is missing.');
+    }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . (string)filesize($path));
+    header('Content-Disposition: attachment; filename="' . str_replace(['"', "\r", "\n"], '', $originalName) . '"');
+    header('X-Content-Type-Options: nosniff');
+    readfile($path);
+    exit;
+}
+
 // ---------------------------------------------------------------------------
 // Leave balances
 // ---------------------------------------------------------------------------
@@ -643,4 +728,25 @@ function cert_effective_status(array $cert): string
         return 'Expired';
     }
     return $cert['status'];
+}
+
+// Generic expiry classification for anything that lapses: compliance
+// documents, manufacturer authorizations, securities. Returns 'None' when no
+// date is set, 'Expired' once past, 'Expiring' inside the warning window, and
+// 'Valid' otherwise. A lapsed compliance document can disqualify a bid, so
+// this drives the same chip treatment certifications get.
+function expiry_status(?string $expiryDate, int $warnDays = 60): string
+{
+    if (empty($expiryDate)) {
+        return 'None';
+    }
+    $today = new DateTimeImmutable('today');
+    $expiry = new DateTimeImmutable($expiryDate);
+    if ($expiry < $today) {
+        return 'Expired';
+    }
+    if ($expiry <= $today->modify('+' . $warnDays . ' days')) {
+        return 'Expiring';
+    }
+    return 'Valid';
 }

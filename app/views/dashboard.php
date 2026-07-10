@@ -36,6 +36,9 @@ function mx_task_chip(string $priority): string
 <?php if (isset($o['warranty_expiring'])): ?>
     <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-danger)"><?= (int)$o['warranty_expiring'] ?></span><span class="mx-stat-label">Warranties ending in 60 days</span></div></div></div>
 <?php endif; ?>
+<?php if (isset($o['compliance_expiring'])): ?>
+    <div class="col-6 col-md"><div class="mx-card mx-card-body p-3"><div class="mx-stat"><span class="mx-stat-value" style="color:var(--mx-warning)"><?= (int)$o['compliance_expiring'] ?></span><span class="mx-stat-label">Compliance docs ending in 60 days</span></div></div></div>
+<?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -156,6 +159,31 @@ function mx_task_chip(string $priority): string
                     <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
                         <code><?= e($c['code']) ?></code>
                         <div class="flex-grow-1 text-truncate" style="font-size:13px"><?= e($c['name']) ?></div>
+                        <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 30 ? 'mx-chip-warning' : 'mx-chip-info') ?>">
+                            <?= $days < 0 ? 'Expired' : $days . ' days' ?>
+                        </span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if (isset($widgets['compliance_expiry'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Compliance documents</h2><a href="/company/documents" class="btn btn-subtle btn-sm">Library</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['compliance_expiry']): ?>
+                <div class="mx-empty"><i class="fa-solid fa-folder-open"></i><p class="mb-0">Nothing expires in the next 60 days.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['compliance_expiry'] as $c): $days = (int)$c['days_left']; ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <span class="mx-chip mx-chip-plain"><?= e($c['kind']) ?></span>
+                        <div class="flex-grow-1 text-truncate" style="font-size:13px"><?= e($c['label']) ?></div>
                         <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 30 ? 'mx-chip-warning' : 'mx-chip-info') ?>">
                             <?= $days < 0 ? 'Expired' : $days . ' days' ?>
                         </span>

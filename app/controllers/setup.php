@@ -16,6 +16,9 @@ function setup_optional_modules(): array
         'projects'       => 'Projects and tasks with a Kanban board and comments.',
         'assets'         => 'An asset register with an assignment workflow and history.',
         'certifications' => 'Staff certifications with a skills matrix and expiry reminders.',
+        'company_docs'   => 'A compliance library of company documents and references with expiry tracking.',
+        'clients'        => 'A register of clients and procuring entities with an opportunity pipeline.',
+        'suppliers'      => 'A register of suppliers, manufacturers and their authorizations.',
     ];
 }
 
@@ -128,6 +131,31 @@ function submit(): void
     $set('currency', $currency);
     $set('financial_year_start', $fyStart);
     $set('late_threshold', $lateThreshold);
+
+    // Mirror the captured identity into the company_profile row so the
+    // compliance library and tender modules read a populated profile from the
+    // start. Guarded because the profile table arrives with a later migration
+    // and an install may not have applied it yet.
+    if (db_val("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'company_profile'")) {
+        db_query(
+            'INSERT INTO company_profile (id, legal_name, trading_name, reg_number, tax_id, phys_address, postal_address, phone, email, logo_path)
+             VALUES (1,?,?,?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE legal_name = VALUES(legal_name), trading_name = VALUES(trading_name),
+                 reg_number = VALUES(reg_number), tax_id = VALUES(tax_id), phys_address = VALUES(phys_address),
+                 postal_address = VALUES(postal_address), phone = VALUES(phone), email = VALUES(email),
+                 logo_path = COALESCE(VALUES(logo_path), logo_path)',
+            [
+                $legalName, $tradingName,
+                trim((string)($_POST['reg_number'] ?? '')) ?: null,
+                trim((string)($_POST['tax_id'] ?? '')) ?: null,
+                trim((string)($_POST['phys_address'] ?? '')) ?: null,
+                trim((string)($_POST['postal_address'] ?? '')) ?: null,
+                trim((string)($_POST['company_phone'] ?? '')) ?: null,
+                $companyEmail ?: null,
+                $logoPath,
+            ]
+        );
+    }
 
     // Repurpose the seeded administrator as the company's first admin.
     $adminRoleId = (int)db_val("SELECT id FROM roles WHERE role_key = 'admin'");

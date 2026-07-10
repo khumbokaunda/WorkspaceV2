@@ -2,6 +2,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <h1 style="font-size:20px" class="mb-0">Settings</h1>
     <div class="d-flex gap-2">
+        <a href="/admin/company-profile" class="btn btn-outline-primary"><i class="fa-solid fa-building me-2"></i>Company profile</a>
         <a href="/admin/modules" class="btn btn-outline-primary"><i class="fa-solid fa-toggle-on me-2"></i>Modules</a>
         <a href="/admin/about" class="btn btn-outline-primary"><i class="fa-solid fa-circle-info me-2"></i>About</a>
     </div>

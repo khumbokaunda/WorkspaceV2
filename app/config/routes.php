@@ -105,6 +105,52 @@ return [
     ['PATCH',  '/certifications/{id}',        'certifications@update',      ['auth', 'csrf', 'rbac:certifications.manage_own']],
     ['DELETE', '/certifications/{id}',        'certifications@destroy',     ['auth', 'csrf', 'rbac:certifications.manage_own']],
 
+    // Company profile and compliance library
+    ['GET',    '/company/documents',              'company@library',              ['auth', 'rbac:company_docs.view', 'module:company_docs']],
+    ['GET',    '/api/company/documents',          'company@documents_json',       ['auth', 'rbac:company_docs.view']],
+    ['POST',   '/company/documents',              'company@upload_document',      ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['PATCH',  '/company/documents/{id}',         'company@update_document',      ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['DELETE', '/company/documents/{id}',         'company@delete_document',      ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['POST',   '/company/documents/{id}/link',    'company@document_link',        ['auth', 'csrf', 'rbac:company_docs.view']],
+    ['GET',    '/company/files/{token}',          'company@download_document',    ['auth', 'rbac:company_docs.view']],
+    ['GET',    '/api/company/references',         'company@references_json',      ['auth', 'rbac:company_docs.view']],
+    ['POST',   '/company/references',             'company@create_reference',     ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['PATCH',  '/company/references/{id}',        'company@update_reference',     ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['DELETE', '/company/references/{id}',        'company@delete_reference',     ['auth', 'csrf', 'rbac:company_docs.manage']],
+    ['POST',   '/company/references/{id}/cert-link', 'company@reference_cert_link', ['auth', 'csrf', 'rbac:company_docs.view']],
+    ['GET',    '/company/references/file/{token}','company@download_reference_cert', ['auth', 'rbac:company_docs.view']],
+
+    // Company profile editor, in the admin Settings area
+    ['GET',    '/admin/company-profile',          'company@profile_form',         ['auth', 'rbac:admin.settings', 'module:admin_settings']],
+    ['POST',   '/admin/company-profile',          'company@profile_save',         ['auth', 'csrf', 'rbac:admin.settings']],
+
+    // Clients and opportunities
+    ['GET',    '/clients',                        'clients@index',                ['auth', 'rbac:clients.view', 'module:clients']],
+    ['GET',    '/clients/{id}',                   'clients@show',                 ['auth', 'rbac:clients.view', 'module:clients']],
+    ['GET',    '/api/clients',                    'clients@list_json',            ['auth', 'rbac:clients.view']],
+    ['POST',   '/clients',                        'clients@create',               ['auth', 'csrf', 'rbac:clients.manage']],
+    ['PATCH',  '/clients/{id}',                   'clients@update',               ['auth', 'csrf', 'rbac:clients.manage']],
+    ['DELETE', '/clients/{id}',                   'clients@destroy',              ['auth', 'csrf', 'rbac:clients.manage']],
+    ['POST',   '/clients/{id}/contacts',          'clients@add_contact',          ['auth', 'csrf', 'rbac:clients.manage']],
+    ['DELETE', '/clients/contacts/{id}',          'clients@delete_contact',       ['auth', 'csrf', 'rbac:clients.manage']],
+    ['GET',    '/api/opportunities',              'clients@opportunities_json',   ['auth', 'rbac:clients.view']],
+    ['POST',   '/opportunities',                  'clients@create_opportunity',   ['auth', 'csrf', 'rbac:clients.manage']],
+    ['PATCH',  '/opportunities/{id}',             'clients@update_opportunity',   ['auth', 'csrf', 'rbac:clients.manage']],
+    ['DELETE', '/opportunities/{id}',             'clients@delete_opportunity',   ['auth', 'csrf', 'rbac:clients.manage']],
+
+    // Suppliers and manufacturer authorizations
+    ['GET',    '/suppliers',                      'suppliers@index',              ['auth', 'rbac:suppliers.view', 'module:suppliers']],
+    ['GET',    '/suppliers/{id}',                 'suppliers@show',               ['auth', 'rbac:suppliers.view', 'module:suppliers']],
+    ['GET',    '/api/suppliers',                  'suppliers@list_json',          ['auth', 'rbac:suppliers.view']],
+    ['POST',   '/suppliers',                      'suppliers@create',             ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['PATCH',  '/suppliers/{id}',                 'suppliers@update',             ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['DELETE', '/suppliers/{id}',                 'suppliers@destroy',            ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['POST',   '/suppliers/{id}/authorizations',  'suppliers@add_authorization',  ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['PATCH',  '/suppliers/authorizations/{id}',  'suppliers@update_authorization', ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['DELETE', '/suppliers/authorizations/{id}',  'suppliers@delete_authorization', ['auth', 'csrf', 'rbac:suppliers.manage']],
+    ['POST',   '/suppliers/authorizations/{id}/link', 'suppliers@authorization_link', ['auth', 'csrf', 'rbac:suppliers.view']],
+    ['GET',    '/suppliers/authorizations/file/{token}', 'suppliers@download_authorization', ['auth', 'rbac:suppliers.view']],
+
     // Admin
     ['GET',    '/admin/users',                'admin_users@index',          ['auth', 'rbac:admin.users', 'module:admin_users']],
     ['POST',   '/admin/users',                'admin_users@create',         ['auth', 'csrf', 'rbac:admin.users']],

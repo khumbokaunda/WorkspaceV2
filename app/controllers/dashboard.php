@@ -55,6 +55,30 @@ function index(): void
         );
     }
 
+    if (module_visible('widget.compliance_expiry') && module_enabled('company_docs')) {
+        // Compliance documents and manufacturer authorizations lapsing soon or
+        // already expired. A lapsed tax compliance certificate can disqualify a
+        // bid, so these surface here the way certifications do. The two sources
+        // are merged and sorted by the soonest expiry.
+        $docs = db_all(
+            "SELECT title AS label, 'Document' AS kind, expiry_date,
+                    DATEDIFF(expiry_date, CURDATE()) AS days_left
+             FROM company_documents
+             WHERE expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)"
+        );
+        $auths = db_all(
+            "SELECT CONCAT(s.name, ' - ', ma.product_line) AS label, 'Authorization' AS kind, ma.expiry_date,
+                    DATEDIFF(ma.expiry_date, CURDATE()) AS days_left
+             FROM manufacturer_authorizations ma
+             JOIN suppliers s ON s.id = ma.supplier_id
+             WHERE ma.status <> 'Revoked' AND ma.expiry_date IS NOT NULL
+               AND ma.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)"
+        );
+        $items = array_merge($docs, $auths);
+        usort($items, fn($a, $b) => (int)$a['days_left'] <=> (int)$b['days_left']);
+        $widgets['compliance_expiry'] = array_slice($items, 0, 6);
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,
@@ -97,6 +121,12 @@ function index(): void
                 "SELECT COUNT(*) FROM assets
                  WHERE warranty_expiry IS NOT NULL AND status <> 'Retired'
                    AND warranty_expiry <= DATE_ADD(CURDATE(), INTERVAL 60 DAY) AND warranty_expiry >= CURDATE()"
+            );
+        }
+        if (module_enabled('company_docs')) {
+            $overview['compliance_expiring'] = (int)db_val(
+                "SELECT COUNT(*) FROM company_documents
+                 WHERE expiry_date IS NOT NULL AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)"
             );
         }
         $widgets['org_overview'] = $overview;

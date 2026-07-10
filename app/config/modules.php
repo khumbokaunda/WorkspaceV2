@@ -16,6 +16,15 @@ return [
     'people'         => ['nav' => true,  'section' => 'People', 'label' => 'Directory',              'icon' => 'fa-users',           'path' => '/people',         'permission' => 'people.view'],
     'certifications' => ['nav' => true,  'section' => 'People', 'label' => 'Certifications',         'icon' => 'fa-certificate',     'path' => '/certifications', 'permission' => 'certifications.view'],
 
+    // Navigation: Sales
+    'clients'        => ['nav' => true,  'section' => 'Sales',  'label' => 'Clients',                'icon' => 'fa-handshake',       'path' => '/clients',        'permission' => 'clients.view'],
+
+    // Navigation: Company
+    'company_docs'   => ['nav' => true,  'section' => 'Company','label' => 'Compliance Library',     'icon' => 'fa-folder-tree',     'path' => '/company/documents', 'permission' => 'company_docs.view'],
+
+    // Navigation: Procurement
+    'suppliers'      => ['nav' => true,  'section' => 'Procurement', 'label' => 'Suppliers',         'icon' => 'fa-truck-field',     'path' => '/suppliers',      'permission' => 'suppliers.view'],
+
     // Navigation: Assets
     'assets'         => ['nav' => true,  'section' => 'Assets', 'label' => 'Asset Register',         'icon' => 'fa-laptop',          'path' => '/assets',         'permission' => 'assets.view'],
 
@@ -34,4 +43,5 @@ return [
     'widget.org_overview'      => ['nav' => false, 'label' => 'Organization overview',  'permission' => 'attendance.view_all'],
     'widget.task_throughput'   => ['nav' => false, 'label' => 'Task throughput',        'permission' => 'projects.view'],
     'widget.asset_utilization' => ['nav' => false, 'label' => 'Asset utilization',      'permission' => 'assets.view'],
+    'widget.compliance_expiry' => ['nav' => false, 'label' => 'Compliance documents',   'permission' => 'company_docs.view'],
 ];
