@@ -54,7 +54,12 @@ var mxCanComment = <?= $canComment ? 'true' : 'false' ?>;
 var mxCanCreateTask = <?= $canCreateTask ? 'true' : 'false' ?>;
 var mxTasks = [];
 var mxToday = '';
-var mxTaskCalMonth = MX.today().slice(0, 7);
+// Current local year and month. Computed inline rather than through MX.today,
+// because this line runs as the page parses, before app.js has loaded.
+var mxTaskCalMonth = (function () {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+})();
 var TASK_STATUSES = ['To Do', 'In Progress', 'Blocked', 'Done'];
 
 function mxPrioChip(p) {
