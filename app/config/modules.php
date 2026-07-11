@@ -12,6 +12,7 @@ return [
     'leave'          => ['nav' => true,  'section' => 'Work',   'label' => 'Leave',                  'icon' => 'fa-umbrella-beach',  'path' => '/leave',          'permission' => 'leave.view'],
     'projects'       => ['nav' => true,  'section' => 'Work',   'label' => 'Projects and Tasks',     'icon' => 'fa-list-check',      'path' => '/projects',       'permission' => 'projects.view'],
     'timesheets'     => ['nav' => true,  'section' => 'Work',   'label' => 'Timesheets',             'icon' => 'fa-business-time',   'path' => '/timesheets',     'permission' => 'timesheets.log'],
+    'helpdesk'       => ['nav' => true,  'section' => 'Work',   'label' => 'Helpdesk',               'icon' => 'fa-headset',         'path' => '/helpdesk',       'permission' => 'helpdesk.raise'],
 
     // Navigation: People
     'people'         => ['nav' => true,  'section' => 'People', 'label' => 'Directory',              'icon' => 'fa-users',           'path' => '/people',         'permission' => 'people.view'],
@@ -58,4 +59,5 @@ return [
     'widget.procurement_approvals' => ['nav' => false, 'label' => 'Requisition approvals', 'permission' => 'procurement.approve'],
     'widget.expense_approvals' => ['nav' => false, 'label' => 'Expense approvals',       'permission' => 'expenses.approve'],
     'widget.contract_renewals' => ['nav' => false, 'label' => 'Contract renewals',       'permission' => 'contracts.view'],
+    'widget.helpdesk_queue'    => ['nav' => false, 'label' => 'Helpdesk queue',          'permission' => 'helpdesk.manage'],
 ];

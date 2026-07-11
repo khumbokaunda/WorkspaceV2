@@ -128,6 +128,13 @@ function index(): void
         );
     }
 
+    if (module_visible('widget.helpdesk_queue') && module_enabled('helpdesk')) {
+        $widgets['helpdesk_queue'] = db_all(
+            "SELECT id, subject, priority, status FROM tickets WHERE status <> 'Closed'
+             ORDER BY FIELD(priority,'Urgent','High','Normal','Low'), created_at LIMIT 6"
+        );
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,

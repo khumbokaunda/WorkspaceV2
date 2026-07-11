@@ -27,6 +27,7 @@ function setup_optional_modules(): array
         'contracts'      => 'Contracts and agreements with renewal alerts and the signed contract file.',
         'timesheets'     => 'Hours logged against projects and tasks, with a billable flag and utilisation.',
         'noticeboard'    => 'Internal announcements and a read-only library of company policies.',
+        'helpdesk'       => 'A lightweight ticket system for staff to report IT or facilities issues.',
     ];
 }
 

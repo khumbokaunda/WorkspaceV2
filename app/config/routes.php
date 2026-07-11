@@ -256,6 +256,13 @@ return [
     ['PATCH',  '/timesheets/{id}',                'timesheets@update_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
     ['DELETE', '/timesheets/{id}',                'timesheets@delete_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
 
+    // Internal helpdesk
+    ['GET',    '/helpdesk',                       'helpdesk@index',               ['auth', 'rbac:helpdesk.raise', 'module:helpdesk']],
+    ['GET',    '/helpdesk/{id}',                  'helpdesk@show',                ['auth', 'rbac:helpdesk.raise', 'module:helpdesk']],
+    ['POST',   '/helpdesk',                       'helpdesk@create',              ['auth', 'csrf', 'rbac:helpdesk.raise']],
+    ['PATCH',  '/helpdesk/{id}',                  'helpdesk@update',              ['auth', 'csrf', 'rbac:helpdesk.manage']],
+    ['POST',   '/helpdesk/{id}/comments',         'helpdesk@add_comment',         ['auth', 'csrf', 'rbac:helpdesk.raise']],
+
     // Noticeboard and policies
     ['GET',    '/noticeboard',                    'noticeboard@index',            ['auth', 'rbac:noticeboard.view', 'module:noticeboard']],
     ['POST',   '/noticeboard/announcements',      'noticeboard@create_announcement', ['auth', 'csrf', 'rbac:noticeboard.manage']],

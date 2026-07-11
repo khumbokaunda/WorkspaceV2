@@ -296,6 +296,30 @@ function mx_task_chip(string $priority): string
     </div>
 <?php endif; ?>
 
+<?php if (isset($widgets['helpdesk_queue'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Helpdesk queue</h2><a href="/helpdesk" class="btn btn-subtle btn-sm">Helpdesk</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['helpdesk_queue']): ?>
+                <div class="mx-empty"><i class="fa-regular fa-face-smile"></i><p class="mb-0">Nothing open.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['helpdesk_queue'] as $t):
+        $pc = ['Low' => 'mx-chip-plain', 'Normal' => 'mx-chip-info', 'High' => 'mx-chip-warning', 'Urgent' => 'mx-chip-danger'][$t['priority']] ?? 'mx-chip-plain'; ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <span class="mx-chip <?= $pc ?>"><?= e($t['priority']) ?></span>
+                        <a href="/helpdesk/<?= (int)$t['id'] ?>" class="text-truncate flex-grow-1" style="color:var(--mx-text)"><?= e($t['subject']) ?></a>
+                        <small class="text-muted"><?= e($t['status']) ?></small>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (isset($widgets['task_throughput'])): $tt = $widgets['task_throughput']; $total = max(1, array_sum($tt)); ?>
     <div class="col-12 col-lg-4">
         <div class="mx-card h-100">
