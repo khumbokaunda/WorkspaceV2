@@ -248,6 +248,14 @@ return [
     ['POST',   '/expenses/petty-cash',            'expenses@add_petty_entry',     ['auth', 'csrf', 'rbac:pettycash.manage']],
     ['DELETE', '/expenses/petty-cash/{id}',       'expenses@delete_petty_entry',  ['auth', 'csrf', 'rbac:pettycash.manage']],
 
+    // Timesheets and billable hours
+    ['GET',    '/timesheets',                     'timesheets@index',             ['auth', 'rbac:timesheets.log', 'module:timesheets']],
+    ['GET',    '/api/timesheets',                 'timesheets@list_json',         ['auth', 'rbac:timesheets.log']],
+    ['GET',    '/api/timesheets/project/{id}/tasks', 'timesheets@project_tasks_json', ['auth', 'rbac:timesheets.log']],
+    ['POST',   '/timesheets',                     'timesheets@create_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
+    ['PATCH',  '/timesheets/{id}',                'timesheets@update_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
+    ['DELETE', '/timesheets/{id}',                'timesheets@delete_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
+
     // Contracts and renewals
     ['GET',    '/contracts',                      'contracts@index',              ['auth', 'rbac:contracts.view', 'module:contracts']],
     ['GET',    '/api/contracts',                  'contracts@list_json',          ['auth', 'rbac:contracts.view']],
