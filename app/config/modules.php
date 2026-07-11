@@ -15,6 +15,7 @@ return [
     // Navigation: People
     'people'         => ['nav' => true,  'section' => 'People', 'label' => 'Directory',              'icon' => 'fa-users',           'path' => '/people',         'permission' => 'people.view'],
     'certifications' => ['nav' => true,  'section' => 'People', 'label' => 'Certifications',         'icon' => 'fa-certificate',     'path' => '/certifications', 'permission' => 'certifications.view'],
+    'payroll'        => ['nav' => true,  'section' => 'People', 'label' => 'Payroll and HR',         'icon' => 'fa-money-check-dollar', 'path' => '/payroll',     'permission' => 'payroll.view_own'],
 
     // Navigation: Sales
     'clients'        => ['nav' => true,  'section' => 'Sales',  'label' => 'Clients',                'icon' => 'fa-handshake',       'path' => '/clients',        'permission' => 'clients.view'],

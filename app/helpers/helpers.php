@@ -418,6 +418,7 @@ function module_for_permission(string $permissionKey): ?string
         'budgets'        => 'budgets',
         'expenses'       => 'expenses',
         'pettycash'      => 'expenses',
+        'payroll'        => 'payroll',
     ];
     $prefix = explode('.', $permissionKey, 2)[0];
     return $map[$prefix] ?? null;

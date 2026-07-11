@@ -23,6 +23,7 @@ function setup_optional_modules(): array
         'procurement'    => 'Item requests, consolidated requisitions, approvals and fund release, purchase orders and goods receipt.',
         'budgets'        => 'Department budgets that requisitions and purchase orders draw against.',
         'expenses'       => 'Expense claims with receipts and approval, and a petty cash float with a running balance.',
+        'payroll'        => 'Personal records, a configurable pay component engine, salary structures, payroll runs, payslips and staff loans.',
     ];
 }
 

@@ -203,6 +203,21 @@ return [
     ['POST',   '/budgets',                        'procurement@save_budget',      ['auth', 'csrf', 'rbac:budgets.manage']],
     ['DELETE', '/budgets/{id}',                   'procurement@delete_budget',    ['auth', 'csrf', 'rbac:budgets.manage']],
 
+    // Payroll and HR: personal records, pay components, salary structures
+    ['GET',    '/payroll',                        'payroll@index',                ['auth', 'rbac:payroll.view_own', 'module:payroll']],
+    ['GET',    '/payroll/components',             'payroll@components',            ['auth', 'rbac:payroll.manage', 'module:payroll']],
+    ['GET',    '/payroll/records/{id}',           'payroll@records',              ['auth', 'rbac:payroll.view_own', 'module:payroll']],
+    ['GET',    '/api/payroll/structure/{id}',     'payroll@structure_json',       ['auth', 'rbac:payroll.view_own']],
+    ['POST',   '/payroll/records/{id}/details',   'payroll@save_details',         ['auth', 'csrf', 'rbac:payroll.view_own']],
+    ['POST',   '/payroll/records/{id}/beneficiaries', 'payroll@add_beneficiary',  ['auth', 'csrf', 'rbac:payroll.view_own']],
+    ['DELETE', '/payroll/beneficiaries/{id}',     'payroll@delete_beneficiary',   ['auth', 'csrf', 'rbac:payroll.view_own']],
+    ['POST',   '/payroll/records/{id}/bank',      'payroll@add_bank',             ['auth', 'csrf', 'rbac:payroll.view_own']],
+    ['DELETE', '/payroll/bank/{id}',              'payroll@delete_bank',          ['auth', 'csrf', 'rbac:payroll.view_own']],
+    ['POST',   '/payroll/records/{id}/structure', 'payroll@save_structure',       ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['POST',   '/payroll/components',             'payroll@add_component',        ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['PATCH',  '/payroll/components/{id}',        'payroll@update_component',     ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['DELETE', '/payroll/components/{id}',        'payroll@delete_component',     ['auth', 'csrf', 'rbac:payroll.manage']],
+
     // Expenses and petty cash
     ['GET',    '/expenses',                       'expenses@index',               ['auth', 'rbac:expenses.submit', 'module:expenses']],
     ['GET',    '/expenses/petty-cash',            'expenses@petty_cash',          ['auth', 'rbac:pettycash.manage', 'module:expenses']],
