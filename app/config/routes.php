@@ -256,6 +256,16 @@ return [
     ['PATCH',  '/timesheets/{id}',                'timesheets@update_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
     ['DELETE', '/timesheets/{id}',                'timesheets@delete_entry',      ['auth', 'csrf', 'rbac:timesheets.log']],
 
+    // Noticeboard and policies
+    ['GET',    '/noticeboard',                    'noticeboard@index',            ['auth', 'rbac:noticeboard.view', 'module:noticeboard']],
+    ['POST',   '/noticeboard/announcements',      'noticeboard@create_announcement', ['auth', 'csrf', 'rbac:noticeboard.manage']],
+    ['PATCH',  '/noticeboard/announcements/{id}', 'noticeboard@update_announcement', ['auth', 'csrf', 'rbac:noticeboard.manage']],
+    ['DELETE', '/noticeboard/announcements/{id}', 'noticeboard@delete_announcement', ['auth', 'csrf', 'rbac:noticeboard.manage']],
+    ['POST',   '/noticeboard/policies',           'noticeboard@upload_policy',     ['auth', 'csrf', 'rbac:noticeboard.manage']],
+    ['DELETE', '/noticeboard/policies/{id}',      'noticeboard@delete_policy',     ['auth', 'csrf', 'rbac:noticeboard.manage']],
+    ['POST',   '/noticeboard/policies/{id}/link', 'noticeboard@policy_link',       ['auth', 'csrf', 'rbac:noticeboard.view']],
+    ['GET',    '/noticeboard/policies/file/{token}', 'noticeboard@download_policy', ['auth', 'rbac:noticeboard.view']],
+
     // Contracts and renewals
     ['GET',    '/contracts',                      'contracts@index',              ['auth', 'rbac:contracts.view', 'module:contracts']],
     ['GET',    '/api/contracts',                  'contracts@list_json',          ['auth', 'rbac:contracts.view']],

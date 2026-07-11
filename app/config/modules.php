@@ -25,6 +25,7 @@ return [
     // Navigation: Company
     'company_docs'   => ['nav' => true,  'section' => 'Company','label' => 'Compliance Library',     'icon' => 'fa-folder-tree',     'path' => '/company/documents', 'permission' => 'company_docs.view'],
     'contracts'      => ['nav' => true,  'section' => 'Company','label' => 'Contracts',              'icon' => 'fa-file-contract',   'path' => '/contracts',      'permission' => 'contracts.view'],
+    'noticeboard'    => ['nav' => true,  'section' => 'Company','label' => 'Noticeboard',            'icon' => 'fa-bullhorn',        'path' => '/noticeboard',    'permission' => 'noticeboard.view'],
 
     // Navigation: Procurement
     'suppliers'      => ['nav' => true,  'section' => 'Procurement', 'label' => 'Suppliers',         'icon' => 'fa-truck-field',     'path' => '/suppliers',      'permission' => 'suppliers.view'],
