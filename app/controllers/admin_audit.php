@@ -38,5 +38,10 @@ function list_json(): void
             FROM audit_log a LEFT JOIN users u ON u.id = a.user_id'
         . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
         . ' ORDER BY a.id DESC LIMIT 500';
-    json_out(['ok' => true, 'entries' => db_all($sql, $params)]);
+    $entries = db_all($sql, $params);
+    foreach ($entries as &$entry) {
+        $entry['label'] = audit_label($entry['action']);
+    }
+    unset($entry);
+    json_out(['ok' => true, 'entries' => $entries]);
 }

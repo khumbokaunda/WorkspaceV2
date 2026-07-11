@@ -23,7 +23,7 @@ $stChip = fn($s) => ['Open' => 'mx-chip-info', 'In Progress' => 'mx-chip-warning
                     <td><a href="/helpdesk/<?= (int)$t['id'] ?>"><?= e($t['subject']) ?></a></td>
                     <td><?= e($t['category']) ?></td>
                     <td><?= e($t['raiser'] ?: '') ?></td>
-                    <td><?= e($t['assignee'] ?: '<span class="text-muted">Unassigned</span>') ?></td>
+                    <td><?= $t['assignee'] ? e($t['assignee']) : '<span class="text-muted">Unassigned</span>' ?></td>
                     <td><span class="mx-chip <?= $prChip($t['priority']) ?>"><?= e($t['priority']) ?></span></td>
                     <td><span class="mx-chip <?= $stChip($t['status']) ?>"><?= e($t['status']) ?></span></td>
                 </tr>
@@ -48,7 +48,7 @@ $stChip = fn($s) => ['Open' => 'mx-chip-info', 'In Progress' => 'mx-chip-warning
                 <tr>
                     <td><a href="/helpdesk/<?= (int)$t['id'] ?>"><?= e($t['subject']) ?></a></td>
                     <td><?= e($t['category']) ?></td>
-                    <td><?= e($t['assignee'] ?: '<span class="text-muted">Unassigned</span>') ?></td>
+                    <td><?= $t['assignee'] ? e($t['assignee']) : '<span class="text-muted">Unassigned</span>' ?></td>
                     <td><span class="mx-chip <?= $prChip($t['priority']) ?>"><?= e($t['priority']) ?></span></td>
                     <td><span class="mx-chip <?= $stChip($t['status']) ?>"><?= e($t['status']) ?></span></td>
                     <td class="mx-tabular"><?= e(date('j M Y', strtotime($t['created_at']))) ?></td>

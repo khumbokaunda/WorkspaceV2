@@ -147,7 +147,7 @@ $isSelf = (int)(current_user()['person_id'] ?? 0) === (int)$person['id'];
                 <ul class="mx-timeline">
 <?php foreach ($activity as $ev): ?>
                     <li>
-                        <div style="font-size:13px"><?= e($ev['action']) ?></div>
+                        <div style="font-size:13px"><?= e(audit_label($ev['action'])) ?></div>
                         <div class="mx-timeline-time"><?= e(date('j M Y H:i', strtotime($ev['created_at']))) ?></div>
                     </li>
 <?php endforeach; ?>

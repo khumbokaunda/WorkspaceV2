@@ -58,7 +58,7 @@ function mxLoadAudit() {
                 return [
                     '<span class="mx-tabular" style="white-space:nowrap">' + when + '</span>',
                     MX.escape(a.username || 'system'),
-                    '<code>' + MX.escape(a.action) + '</code>',
+                    MX.escape(a.label || a.action) + '<code class="text-muted d-block" style="font-size:11px">' + MX.escape(a.action) + '</code>',
                     '<span style="white-space:nowrap">' + MX.escape(a.entity + (a.entity_id ? ' #' + a.entity_id : '')) + '</span>',
                     '<span class="mx-audit-detail" style="font-size:12px" title="' + detailFull + '">' + detailShort + '</span>',
                     '<code style="font-size:11px;white-space:nowrap">' + MX.escape(a.ip_address || '') + '</code>'

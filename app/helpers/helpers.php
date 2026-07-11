@@ -590,6 +590,130 @@ function module_visible(string $moduleKey, ?array $user = null): bool
 // Audit and notifications
 // ---------------------------------------------------------------------------
 
+// Turn a machine action key like 'bank_account.add' into a short, readable
+// phrase like 'Added a bank account', so activity feeds and the audit log make
+// sense to any reader. A curated map handles the phrases that would otherwise
+// read awkwardly; everything else is built from a verb and a noun so new
+// actions are covered without a code change.
+function audit_label(string $action): string
+{
+    static $exact = [
+        'login'                            => 'Signed in',
+        'logout'                           => 'Signed out',
+        'password.change'                  => 'Changed their password',
+        'password.reset_requested'         => 'Requested a password reset',
+        'password.reset_completed'         => 'Completed a password reset',
+        'two_factor.enabled'               => 'Turned on two-factor authentication',
+        'two_factor.disabled'              => 'Turned off two-factor authentication',
+        'two_factor.pass'                  => 'Passed two-factor verification',
+        'two_factor.recovery_used'         => 'Used a two-factor recovery code',
+        'two_factor.recovery_regenerated'  => 'Regenerated two-factor recovery codes',
+        'setup.completed'                  => 'Completed the initial setup',
+        'settings.update'                  => 'Updated the settings',
+        'modules.update'                   => 'Changed the enabled modules',
+        'license.update'                   => 'Updated the license',
+        'role.permissions'                 => 'Updated role permissions',
+        'role.visibility'                  => 'Updated module visibility',
+        'company_profile.update'           => 'Updated the company profile',
+        'user.create'                      => 'Created a user account',
+        'user.groups'                      => 'Updated group membership',
+        'user.overrides'                   => 'Updated personal access',
+        'user.person_link'                 => 'Linked the account to a person',
+        'user.email_change'                => 'Changed the account email',
+        'user.username_change'             => 'Changed the account username',
+        'user.password_reset'              => 'Reset the account password',
+        'user.enable'                      => 'Enabled the account',
+        'user.disable'                     => 'Disabled the account',
+        'group.save'                       => 'Saved a group',
+        'group.delete'                     => 'Deleted a group',
+        'group.archive'                    => 'Archived a group',
+        'group.restore'                    => 'Restored a group',
+        'group.member_add'                 => 'Added a group member',
+        'group.member_remove'              => 'Removed a group member',
+        'person.create'                    => 'Created the staff record',
+        'person.update'                    => 'Updated the staff record',
+        'person.terminate'                 => 'Ended employment',
+        'person_details.save'              => 'Updated personal details',
+        'bank_account.add'                 => 'Added a bank account',
+        'bank_account.delete'              => 'Removed a bank account',
+        'beneficiary.add'                  => 'Added a beneficiary',
+        'beneficiary.delete'              => 'Removed a beneficiary',
+        'attendance.check_in'              => 'Checked in',
+        'attendance.check_out'             => 'Checked out',
+        'attendance.correct'               => 'Corrected an attendance record',
+        'leave.request'                    => 'Requested leave',
+        'leave.approve'                    => 'Approved a leave request',
+        'leave.reject'                     => 'Rejected a leave request',
+        'leave.cancel'                     => 'Cancelled a leave request',
+        'task.status'                      => 'Changed a task status',
+        'task.comment'                     => 'Commented on a task',
+        'ticket.comment'                   => 'Commented on a ticket',
+        'asset.assign'                     => 'Assigned an asset',
+        'asset.return'                     => 'Returned an asset',
+        'asset.import'                     => 'Imported assets',
+        'payslip.email'                    => 'Emailed a payslip',
+        'payroll_run.compute'              => 'Calculated a payroll run',
+        'payroll_run.paid'                 => 'Marked a payroll run as paid',
+        'staff_loan.decide'               => 'Reviewed a staff loan',
+        'requisition.decide'               => 'Reviewed a requisition',
+        'expense_claim.decide'             => 'Reviewed an expense claim',
+        'expense_claim.reimburse'          => 'Reimbursed an expense claim',
+        'tender.go_assessment'             => 'Recorded a go / no-go assessment',
+        'tender.outcome'                   => 'Recorded the tender outcome',
+        'tender.project.create'            => 'Created a project from the tender',
+        'tender.boq.add'                   => 'Added a bill of quantities line',
+        'tender.boq.update'                => 'Updated a bill of quantities line',
+        'tender.boq.delete'                => 'Removed a bill of quantities line',
+        'tender.criterion.add'             => 'Added a compliance criterion',
+        'tender.criterion.update'          => 'Updated a compliance criterion',
+        'tender.criterion.delete'          => 'Removed a compliance criterion',
+        'tender.requirement.add'           => 'Added a tender requirement',
+        'tender.requirement.update'        => 'Updated a tender requirement',
+        'tender.requirement.delete'        => 'Removed a tender requirement',
+        'tender.security.add'              => 'Added a bid security',
+        'tender.security.update'           => 'Updated a bid security',
+        'tender.security.delete'           => 'Removed a bid security',
+        'tender.document.add'              => 'Added a tender document',
+        'tender.document.update'           => 'Updated a tender document',
+        'tender.document.delete'           => 'Removed a tender document',
+        'tender.team.add'                  => 'Added a bid team member',
+        'tender.team.remove'               => 'Removed a bid team member',
+        'purchase_order.item.add'          => 'Added a purchase order item',
+        'purchase_order.item.delete'       => 'Removed a purchase order item',
+        'certification.attach_file'        => 'Attached a certificate file',
+        'certification.download_file'      => 'Downloaded a certificate file',
+    ];
+    if (isset($exact[$action])) {
+        return $exact[$action];
+    }
+
+    static $verbs = [
+        'create'   => 'Created',   'update'   => 'Updated',   'delete'  => 'Deleted',
+        'add'      => 'Added',     'remove'   => 'Removed',    'save'    => 'Saved',
+        'download' => 'Downloaded','upload'   => 'Uploaded',   'submit'  => 'Submitted',
+        'approve'  => 'Approved',  'reject'   => 'Rejected',   'cancel'  => 'Cancelled',
+        'decide'   => 'Reviewed',  'assign'   => 'Assigned',   'return'  => 'Returned',
+        'restore'  => 'Restored',  'archive'  => 'Archived',   'request' => 'Requested',
+        'acknowledge' => 'Acknowledged', 'compute' => 'Calculated', 'paid' => 'Marked paid',
+        'reimburse'=> 'Reimbursed','import'   => 'Imported',   'comment' => 'Commented on',
+        'status'   => 'Updated the status of', 'correct' => 'Corrected', 'terminate' => 'Ended',
+    ];
+    $parts = explode('.', $action);
+    $verb = array_pop($parts);
+    $nounKey = implode(' ', $parts);
+    $noun = trim(str_replace('_', ' ', $nounKey));
+
+    if (isset($verbs[$verb])) {
+        if ($noun === '') {
+            return $verbs[$verb];
+        }
+        $article = in_array(strtolower($noun[0]), ['a', 'e', 'i', 'o', 'u'], true) ? 'an' : 'a';
+        return $verbs[$verb] . ' ' . $article . ' ' . $noun;
+    }
+    // Unknown verb: humanize the whole key as a readable fallback.
+    return ucfirst(trim(str_replace(['.', '_'], ' ', $action)));
+}
+
 function audit(string $action, string $entity, ?int $entityId = null, array $detail = []): void
 {
     $user = defined('MERIDIAN_CLI') ? null : current_user();
