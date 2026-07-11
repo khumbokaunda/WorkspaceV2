@@ -203,6 +203,24 @@ return [
     ['POST',   '/budgets',                        'procurement@save_budget',      ['auth', 'csrf', 'rbac:budgets.manage']],
     ['DELETE', '/budgets/{id}',                   'procurement@delete_budget',    ['auth', 'csrf', 'rbac:budgets.manage']],
 
+    // Expenses and petty cash
+    ['GET',    '/expenses',                       'expenses@index',               ['auth', 'rbac:expenses.submit', 'module:expenses']],
+    ['GET',    '/expenses/petty-cash',            'expenses@petty_cash',          ['auth', 'rbac:pettycash.manage', 'module:expenses']],
+    ['GET',    '/expenses/receipts/file/{token}', 'expenses@download_receipt',    ['auth', 'rbac:expenses.submit']],
+    ['GET',    '/expenses/{id}',                  'expenses@claim',               ['auth', 'rbac:expenses.submit', 'module:expenses']],
+    ['POST',   '/expenses',                       'expenses@create_claim',        ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['PATCH',  '/expenses/{id}',                  'expenses@update_claim',        ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['DELETE', '/expenses/{id}',                  'expenses@delete_claim',        ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['POST',   '/expenses/{id}/submit',           'expenses@submit_claim',        ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['POST',   '/expenses/{id}/decide',           'expenses@decide_claim',        ['auth', 'csrf', 'rbac:expenses.approve']],
+    ['POST',   '/expenses/{id}/reimburse',        'expenses@reimburse_claim',     ['auth', 'csrf', 'rbac:expenses.approve']],
+    ['POST',   '/expenses/{id}/lines',            'expenses@add_line',            ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['PATCH',  '/expenses/lines/{id}',            'expenses@update_line',         ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['DELETE', '/expenses/lines/{id}',            'expenses@delete_line',         ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['POST',   '/expenses/lines/{id}/receipt-link', 'expenses@receipt_link',      ['auth', 'csrf', 'rbac:expenses.submit']],
+    ['POST',   '/expenses/petty-cash',            'expenses@add_petty_entry',     ['auth', 'csrf', 'rbac:pettycash.manage']],
+    ['DELETE', '/expenses/petty-cash/{id}',       'expenses@delete_petty_entry',  ['auth', 'csrf', 'rbac:pettycash.manage']],
+
     // Admin
     ['GET',    '/admin/users',                'admin_users@index',          ['auth', 'rbac:admin.users', 'module:admin_users']],
     ['POST',   '/admin/users',                'admin_users@create',         ['auth', 'csrf', 'rbac:admin.users']],

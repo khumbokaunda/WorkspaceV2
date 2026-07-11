@@ -249,6 +249,31 @@ function mx_task_chip(string $priority): string
     </div>
 <?php endif; ?>
 
+<?php if (isset($widgets['expense_approvals'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Expense approvals</h2><a href="/expenses" class="btn btn-subtle btn-sm">Expenses</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['expense_approvals']): ?>
+                <div class="mx-empty"><i class="fa-regular fa-thumbs-up"></i><p class="mb-0">No claims awaiting approval.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['expense_approvals'] as $ec): ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <div class="flex-grow-1 text-truncate" style="font-size:13px">
+                            <a href="/expenses/<?= (int)$ec['id'] ?>" style="color:var(--mx-text)"><?= e($ec['title']) ?></a>
+                            <span class="text-muted d-block" style="font-size:11px"><?= e($ec['claimant'] ?: '') ?></span>
+                        </div>
+                        <span class="mx-tabular" style="font-size:12px"><?= e(setting('currency', 'MWK')) ?> <?= number_format((float)$ec['total'], 0) ?></span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (isset($widgets['task_throughput'])): $tt = $widgets['task_throughput']; $total = max(1, array_sum($tt)); ?>
     <div class="col-12 col-lg-4">
         <div class="mx-card h-100">

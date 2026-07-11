@@ -28,6 +28,9 @@ return [
     'procurement'    => ['nav' => true,  'section' => 'Procurement', 'label' => 'Procurement',       'icon' => 'fa-cart-flatbed',    'path' => '/procurement',    'permission' => 'procurement.view'],
     'budgets'        => ['nav' => true,  'section' => 'Procurement', 'label' => 'Budgets',           'icon' => 'fa-money-bill-trend-up', 'path' => '/budgets',    'permission' => 'budgets.view'],
 
+    // Navigation: Finance
+    'expenses'       => ['nav' => true,  'section' => 'Finance', 'label' => 'Expenses',              'icon' => 'fa-receipt',         'path' => '/expenses',       'permission' => 'expenses.submit'],
+
     // Navigation: Assets
     'assets'         => ['nav' => true,  'section' => 'Assets', 'label' => 'Asset Register',         'icon' => 'fa-laptop',          'path' => '/assets',         'permission' => 'assets.view'],
 
@@ -49,4 +52,5 @@ return [
     'widget.compliance_expiry' => ['nav' => false, 'label' => 'Compliance documents',   'permission' => 'company_docs.view'],
     'widget.tender_deadlines'  => ['nav' => false, 'label' => 'Tender deadlines',        'permission' => 'tenders.view'],
     'widget.procurement_approvals' => ['nav' => false, 'label' => 'Requisition approvals', 'permission' => 'procurement.approve'],
+    'widget.expense_approvals' => ['nav' => false, 'label' => 'Expense approvals',       'permission' => 'expenses.approve'],
 ];

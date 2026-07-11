@@ -109,6 +109,15 @@ function index(): void
         );
     }
 
+    if (module_visible('widget.expense_approvals') && module_enabled('expenses')) {
+        $widgets['expense_approvals'] = db_all(
+            "SELECT ec.id, ec.title, ec.total,
+                    COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))),''), u.username) AS claimant
+             FROM expense_claims ec LEFT JOIN users u ON u.id = ec.claimant_id LEFT JOIN people p ON p.id = u.person_id
+             WHERE ec.status = 'Submitted' ORDER BY ec.submitted_at LIMIT 6"
+        );
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,
