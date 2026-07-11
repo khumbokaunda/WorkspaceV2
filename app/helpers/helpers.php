@@ -313,11 +313,16 @@ function current_user(): ?array
     if (empty($_SESSION['user_id'])) {
         return $user = null;
     }
+    // Access comes from groups now; the role is kept only for the transition and
+    // is joined loosely (role_id may be null). The primary department is carried
+    // for display in the shell.
     $user = db_row(
         'SELECT u.*, r.role_key, r.display_name AS role_name,
-                p.first_name, p.last_name, p.job_title, p.department
+                p.first_name, p.last_name, p.job_title, p.department,
+                (SELECT g.name FROM user_groups ug JOIN `groups` g ON g.id = ug.group_id
+                   WHERE ug.user_id = u.id AND ug.is_primary = 1 LIMIT 1) AS primary_department
          FROM users u
-         JOIN roles r ON r.id = u.role_id
+         LEFT JOIN roles r ON r.id = u.role_id
          LEFT JOIN people p ON p.id = u.person_id
          WHERE u.id = ? AND u.is_active = 1',
         [(int)$_SESSION['user_id']]
@@ -335,7 +340,10 @@ function user_display_name(?array $user = null): string
     return $name !== '' ? $name : $user['username'];
 }
 
-// Effective permission: role defaults, then per-user overrides on top.
+// Effective permission set. Access resolves additively: the union of the
+// permissions granted by every group the user belongs to (their department plus
+// any access groups), after which per-person overrides apply. A revoke removes a
+// permission and beats any group grant. Resolved live and cached per request.
 function user_permissions(?array $user = null): array
 {
     static $cache = [];
@@ -349,12 +357,16 @@ function user_permissions(?array $user = null): array
     }
     $set = [];
     foreach (db_all(
-        'SELECT p.permission_key FROM role_permissions rp
-         JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ?',
-        [(int)$user['role_id']]
+        'SELECT DISTINCT p.permission_key
+         FROM user_groups ug
+         JOIN group_permissions gp ON gp.group_id = ug.group_id
+         JOIN permissions p ON p.id = gp.permission_id
+         WHERE ug.user_id = ?',
+        [$uid]
     ) as $row) {
         $set[$row['permission_key']] = true;
     }
+    // Per-person overrides: a grant adds, a revoke removes. Revoke wins.
     foreach (db_all(
         'SELECT p.permission_key, o.effect FROM user_permission_overrides o
          JOIN permissions p ON p.id = o.permission_id WHERE o.user_id = ?',
@@ -369,9 +381,33 @@ function user_permissions(?array $user = null): array
     return $cache[$uid] = $set;
 }
 
+// Whether the user holds system administration, which short-circuits every
+// permission check so an administrator is never locked out of administration.
+function user_is_admin(?array $user = null): bool
+{
+    return isset(user_permissions($user)['system.admin']);
+}
+
 function user_can(string $permissionKey, ?array $user = null): bool
 {
-    return isset(user_permissions($user)[$permissionKey]);
+    $perms = user_permissions($user);
+    if (isset($perms['system.admin'])) {
+        return true;
+    }
+    return isset($perms[$permissionKey]);
+}
+
+// The group ids a user belongs to, primary department first.
+function user_group_ids(?array $user = null): array
+{
+    $user = $user ?? current_user();
+    if (!$user) {
+        return [];
+    }
+    return array_map(
+        fn($r) => (int)$r['group_id'],
+        db_all('SELECT group_id FROM user_groups WHERE user_id = ? ORDER BY is_primary DESC', [(int)$user['id']])
+    );
 }
 
 // Module catalog, loaded once.
@@ -438,9 +474,21 @@ function setup_completed(): bool
     return setting('setup_completed', '0') === '1';
 }
 
-// Effective visibility: instance enablement first, then role default row,
-// overridden by a per-user row. A module with no visibility row defaults to
-// visible (permission still gates it), but a disabled module never appears.
+// Core modules that are always in the navigation regardless of visibility rules,
+// so no combination of settings can strand a user with no way to move.
+function core_visible_modules(): array
+{
+    return ['dashboard' => true];
+}
+
+// Effective visibility. Instance enablement is the hard gate and is checked
+// first: a disabled module does not exist for anyone. Above that the default is
+// permission-derived, a module is visible when the user holds its permission,
+// and that default can be forced by group and per-user visibility rows with a
+// clear precedence: a per-user row wins over any group row, a group that hides
+// beats a group that shows, and an explicit hide beats the permission default.
+// Administrators (system.admin) see every enabled module. Core modules are
+// always visible.
 function visible_modules(?array $user = null): array
 {
     static $cache = [];
@@ -452,27 +500,51 @@ function visible_modules(?array $user = null): array
     if (isset($cache[$uid])) {
         return $cache[$uid];
     }
-    $vis = [];
+    $admin = user_is_admin($user);
+    $core = core_visible_modules();
+
+    // Group visibility: hide wins over show, so a single hiding group forces the
+    // module out even if another group shows it.
+    $groupVis = [];
     foreach (db_all(
-        "SELECT module_key, is_visible FROM module_visibility WHERE scope = 'role' AND scope_id = ?",
-        [(int)$user['role_id']]
+        'SELECT gmv.module_key, MIN(gmv.is_visible) AS is_visible
+         FROM user_groups ug
+         JOIN group_module_visibility gmv ON gmv.group_id = ug.group_id
+         WHERE ug.user_id = ?
+         GROUP BY gmv.module_key',
+        [$uid]
     ) as $row) {
-        $vis[$row['module_key']] = (bool)$row['is_visible'];
+        $groupVis[$row['module_key']] = (bool)$row['is_visible'];
     }
+    // Per-user rows override any group decision.
+    $userVis = [];
     foreach (db_all(
         "SELECT module_key, is_visible FROM module_visibility WHERE scope = 'user' AND scope_id = ?",
         [$uid]
     ) as $row) {
-        $vis[$row['module_key']] = (bool)$row['is_visible'];
+        $userVis[$row['module_key']] = (bool)$row['is_visible'];
     }
+
     $result = [];
     foreach (module_catalog() as $key => $meta) {
         if (!module_enabled($key)) {
             continue; // instance gate: disabled modules do not exist for anyone
         }
-        $visible = $vis[$key] ?? true;
-        $permitted = empty($meta['permission']) || user_can($meta['permission'], $user);
-        if ($visible && $permitted) {
+        if (isset($core[$key])) {
+            $result[$key] = $meta; // core modules are always in the navigation
+            continue;
+        }
+        // Default follows permission: an administrator holds everything.
+        $default = empty($meta['permission']) || $admin || user_can($meta['permission'], $user);
+        // Group rows then per-user rows can force the decision either way.
+        $visible = $default;
+        if (isset($groupVis[$key])) {
+            $visible = $groupVis[$key];
+        }
+        if (isset($userVis[$key])) {
+            $visible = $userVis[$key];
+        }
+        if ($visible) {
             $result[$key] = $meta;
         }
     }
@@ -512,18 +584,31 @@ function notify(int $userId, string $body, ?string $link = null, ?string $module
     );
 }
 
-// Broadcast to every active user holding a role. Rows are materialized per
-// user so read state stays a simple flag; role_id records the provenance.
+// Broadcast to every active member of the access group that corresponds to the
+// old role key ('admin' to the Administrators group, 'manager' to Managers, any
+// other key to its role_<key> group). Access now flows through groups, so this
+// reaches whoever holds that standing rather than a role column. Rows are
+// materialized per user so read state stays a simple flag.
 function notify_role(string $roleKey, string $body, ?string $link = null, ?string $moduleKey = null): void
 {
-    $roleId = db_val('SELECT id FROM roles WHERE role_key = ?', [$roleKey]);
-    if ($roleId === null) {
+    $groupKey = match ($roleKey) {
+        'admin'   => 'administrators',
+        'manager' => 'managers',
+        default   => 'role_' . $roleKey,
+    };
+    $groupId = db_val('SELECT id FROM `groups` WHERE group_key = ? AND is_active = 1', [$groupKey]);
+    if ($groupId === null) {
         return;
     }
-    foreach (db_all('SELECT id FROM users WHERE role_id = ? AND is_active = 1', [(int)$roleId]) as $u) {
+    foreach (db_all(
+        'SELECT u.id FROM users u
+         JOIN user_groups ug ON ug.user_id = u.id
+         WHERE ug.group_id = ? AND u.is_active = 1',
+        [(int)$groupId]
+    ) as $u) {
         db_query(
-            'INSERT INTO notifications (user_id, role_id, body, link, module_key) VALUES (?,?,?,?,?)',
-            [(int)$u['id'], (int)$roleId, $body, $link, $moduleKey]
+            'INSERT INTO notifications (user_id, body, link, module_key) VALUES (?,?,?,?)',
+            [(int)$u['id'], $body, $link, $moduleKey]
         );
     }
 }
