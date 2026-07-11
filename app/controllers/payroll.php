@@ -55,6 +55,7 @@ function index(): void
         'canViewAll' => payroll_can_view_all(),
         'canManage' => payroll_can_manage(),
         'canApprove' => payroll_can_approve(),
+        'myPayslips' => my_payslips($myPid),
         'statutoryMode' => setting('payroll_statutory_mode', 'simple'),
         'people' => payroll_can_view_all()
             ? db_all(
@@ -398,4 +399,461 @@ function save_structure(string $id): void
     }
     audit('salary_structure.save', 'person', $personId, ['structure_id' => $structureId, 'basic' => (float)$basic]);
     json_ok(['structure_id' => $structureId]);
+}
+
+// ---------------------------------------------------------------------------
+// Compute engine
+// ---------------------------------------------------------------------------
+
+function run_statuses(): array { return ['Draft', 'Approved', 'Paid']; }
+function loan_statuses(): array { return ['Pending', 'Active', 'Cleared', 'Rejected']; }
+
+// Progressive banded tax on an amount. Each band is {upto, rate}; a null upto is
+// the top band. Only the portion of the amount that falls in a band is taxed at
+// that band's rate.
+function payroll_banded_tax(array $bands, float $amount): float
+{
+    $tax = 0.0;
+    $prev = 0.0;
+    foreach ($bands as $b) {
+        $upto = array_key_exists('upto', $b) && $b['upto'] !== null ? (float)$b['upto'] : INF;
+        $rate = (float)($b['rate'] ?? 0);
+        if ($amount > $prev) {
+            $portion = min($amount, $upto) - $prev;
+            if ($portion > 0) {
+                $tax += $portion * $rate / 100;
+            }
+        }
+        $prev = $upto;
+        if ($amount <= $upto) {
+            break;
+        }
+    }
+    return $tax;
+}
+
+// Compute one person's payslip from their current salary structure and the
+// component rules. In simple mode the banded statutory deductions are skipped,
+// the lighter "record salaries and issue payslips" path. Returns null when the
+// person has no current structure. Does not change any loan balance.
+function compute_person_payslip(int $personId, string $mode): ?array
+{
+    $structure = db_row('SELECT * FROM salary_structures WHERE person_id = ? AND is_current = 1 LIMIT 1', [$personId]);
+    if (!$structure) {
+        return null;
+    }
+    $basic = (float)$structure['basic_salary'];
+    $lines = db_all(
+        'SELECT sl.amount, sl.rate, pc.comp_type, pc.name, pc.calc_method, pc.default_rate, pc.bands, pc.is_taxable
+         FROM salary_structure_lines sl JOIN pay_components pc ON pc.id = sl.component_id
+         WHERE sl.structure_id = ? ORDER BY pc.sort_order, pc.id',
+        [(int)$structure['id']]
+    );
+
+    $earnings = [];
+    $grossBase = $basic;
+    $pctGross = [];
+    foreach ($lines as $l) {
+        if ($l['comp_type'] !== 'Earning') {
+            continue;
+        }
+        $rate = $l['rate'] !== null ? (float)$l['rate'] : ($l['default_rate'] !== null ? (float)$l['default_rate'] : 0.0);
+        if ($l['calc_method'] === 'Fixed Amount') {
+            $val = $l['amount'] !== null ? (float)$l['amount'] : ($l['default_rate'] !== null ? (float)$l['default_rate'] : 0.0);
+            $earnings[] = ['name' => $l['name'], 'amount' => $val, 'taxable' => (int)$l['is_taxable']];
+            $grossBase += $val;
+        } elseif ($l['calc_method'] === 'Percentage of Basic') {
+            $val = $basic * $rate / 100;
+            $earnings[] = ['name' => $l['name'], 'amount' => $val, 'taxable' => (int)$l['is_taxable']];
+            $grossBase += $val;
+        } elseif ($l['calc_method'] === 'Percentage of Gross') {
+            $pctGross[] = ['name' => $l['name'], 'rate' => $rate, 'taxable' => (int)$l['is_taxable']];
+        }
+    }
+    // Percentage-of-gross earnings apply to the base gross computed above.
+    foreach ($pctGross as $pe) {
+        $earnings[] = ['name' => $pe['name'], 'amount' => $grossBase * $pe['rate'] / 100, 'taxable' => $pe['taxable']];
+    }
+
+    $gross = $basic;
+    $taxableGross = $basic;
+    foreach ($earnings as $e) {
+        $gross += $e['amount'];
+        if ($e['taxable']) {
+            $taxableGross += $e['amount'];
+        }
+    }
+
+    $deductions = [];
+    foreach ($lines as $l) {
+        if ($l['comp_type'] !== 'Deduction') {
+            continue;
+        }
+        $rate = $l['rate'] !== null ? (float)$l['rate'] : ($l['default_rate'] !== null ? (float)$l['default_rate'] : 0.0);
+        $val = 0.0;
+        if ($l['calc_method'] === 'Fixed Amount') {
+            $val = $l['amount'] !== null ? (float)$l['amount'] : ($l['default_rate'] !== null ? (float)$l['default_rate'] : 0.0);
+        } elseif ($l['calc_method'] === 'Percentage of Basic') {
+            $val = $basic * $rate / 100;
+        } elseif ($l['calc_method'] === 'Percentage of Gross') {
+            $val = $gross * $rate / 100;
+        } elseif ($l['calc_method'] === 'Banded') {
+            if ($mode !== 'full') {
+                continue; // statutory tax only in full mode
+            }
+            $bands = $l['bands'] ? json_decode($l['bands'], true) : [];
+            $val = is_array($bands) ? payroll_banded_tax($bands, $taxableGross) : 0.0;
+        }
+        $deductions[] = ['name' => $l['name'], 'amount' => round($val, 2)];
+    }
+
+    // Active loans add a recurring deduction until cleared.
+    foreach (db_all("SELECT id, installment, outstanding_balance, reason FROM staff_loans WHERE person_id = ? AND status = 'Active' AND outstanding_balance > 0", [$personId]) as $loan) {
+        $ded = min((float)$loan['installment'], (float)$loan['outstanding_balance']);
+        if ($ded > 0) {
+            $deductions[] = ['name' => 'Loan Repayment' . ($loan['reason'] ? ' (' . $loan['reason'] . ')' : ''), 'amount' => round($ded, 2), 'loan_id' => (int)$loan['id']];
+        }
+    }
+
+    foreach ($earnings as &$e) {
+        $e['amount'] = round($e['amount'], 2);
+    }
+    unset($e);
+    $totalDed = 0.0;
+    foreach ($deductions as $d) {
+        $totalDed += $d['amount'];
+    }
+    return [
+        'basic' => round($basic, 2),
+        'gross' => round($gross, 2),
+        'total_deductions' => round($totalDed, 2),
+        'net' => round($gross - $totalDed, 2),
+        'breakdown' => ['earnings' => $earnings, 'deductions' => $deductions, 'taxable_gross' => round($taxableGross, 2)],
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Payroll runs
+// ---------------------------------------------------------------------------
+
+function runs(): void
+{
+    if (!payroll_can_manage() && !payroll_can_approve()) {
+        render_error(403, 'Access denied', 'You do not have permission to see payroll runs.');
+    }
+    render('payroll/runs', [
+        'pageTitle' => 'Payroll runs',
+        'breadcrumbs' => ['People' => null, 'Payroll' => '/payroll', 'Runs' => null],
+        'runs' => db_all(
+            "SELECT r.*, (SELECT COUNT(*) FROM payslips ps WHERE ps.run_id = r.id) AS payslip_count,
+                    (SELECT COALESCE(SUM(net_pay),0) FROM payslips ps WHERE ps.run_id = r.id) AS net_total
+             FROM payroll_runs r ORDER BY r.period DESC, r.id DESC"
+        ),
+        'canManage' => payroll_can_manage(),
+        'currency' => setting('currency', 'MWK'),
+    ]);
+}
+
+function run(string $id): void
+{
+    if (!payroll_can_manage() && !payroll_can_approve()) {
+        render_error(403, 'Access denied', 'You do not have permission to see this run.');
+    }
+    $runId = (int)$id;
+    $r = db_row('SELECT * FROM payroll_runs WHERE id = ?', [$runId]);
+    if (!$r) {
+        render_error(404, 'Not found', 'That run does not exist.');
+    }
+    render('payroll/run', [
+        'pageTitle' => 'Payroll ' . $r['period'],
+        'breadcrumbs' => ['People' => null, 'Payroll' => '/payroll', 'Runs' => '/payroll/runs', $r['period'] => null],
+        'run' => $r,
+        'payslips' => db_all(
+            "SELECT ps.*, COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))),''), CONCAT('#', ps.person_id)) AS person_name
+             FROM payslips ps JOIN people p ON p.id = ps.person_id WHERE ps.run_id = ? ORDER BY p.first_name",
+            [$runId]
+        ),
+        'canManage' => payroll_can_manage(),
+        'canApprove' => payroll_can_approve(),
+        'currency' => setting('currency', 'MWK'),
+    ]);
+}
+
+function create_run(): void
+{
+    if (!payroll_can_manage()) {
+        json_err('You do not have permission to create payroll runs.', 403);
+    }
+    $period = in_str('period');
+    if (!preg_match('/^\d{4}-\d{2}$/', $period)) {
+        json_err('Enter the period as YYYY-MM.', 422, ['period' => 'Use YYYY-MM.']);
+    }
+    if (db_val('SELECT id FROM payroll_runs WHERE period = ?', [$period])) {
+        json_err('A run already exists for that period.', 409, ['period' => 'Already exists.']);
+    }
+    db_query(
+        'INSERT INTO payroll_runs (period, label, status, created_by) VALUES (?,?,?,?)',
+        [$period, in_str('label') ?: null, 'Draft', (int)current_user()['id']]
+    );
+    $runId = db_insert_id();
+    audit('payroll_run.create', 'payroll_run', $runId, ['period' => $period]);
+    json_ok(['run_id' => $runId]);
+}
+
+// Compute (or recompute) the draft register for every active employee with a
+// current salary structure.
+function compute_run(string $id): void
+{
+    if (!payroll_can_manage()) {
+        json_err('You do not have permission to compute payroll.', 403);
+    }
+    $runId = (int)$id;
+    $r = db_row('SELECT * FROM payroll_runs WHERE id = ?', [$runId]);
+    if (!$r) {
+        json_err('That run does not exist.', 404);
+    }
+    if ($r['status'] !== 'Draft') {
+        json_err('Only a draft run can be computed.', 409);
+    }
+    $mode = setting('payroll_statutory_mode', 'simple');
+    db_query('DELETE FROM payslips WHERE run_id = ?', [$runId]);
+    $count = 0;
+    foreach (db_all("SELECT id FROM people WHERE employment_status = 'Active'") as $p) {
+        $slip = compute_person_payslip((int)$p['id'], $mode);
+        if ($slip === null) {
+            continue;
+        }
+        db_query(
+            'INSERT INTO payslips (run_id, person_id, basic, gross, total_deductions, net_pay, breakdown) VALUES (?,?,?,?,?,?,?)',
+            [$runId, (int)$p['id'], $slip['basic'], $slip['gross'], $slip['total_deductions'], $slip['net'], json_encode($slip['breakdown'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
+        );
+        $count++;
+    }
+    audit('payroll_run.compute', 'payroll_run', $runId, ['payslips' => $count, 'mode' => $mode]);
+    json_ok(['payslips' => $count]);
+}
+
+function approve_run(string $id): void
+{
+    if (!payroll_can_approve()) {
+        json_err('You do not have permission to approve payroll.', 403);
+    }
+    $runId = (int)$id;
+    $r = db_row('SELECT * FROM payroll_runs WHERE id = ?', [$runId]);
+    if (!$r) {
+        json_err('That run does not exist.', 404);
+    }
+    if ($r['status'] !== 'Draft') {
+        json_err('Only a draft run can be approved.', 409);
+    }
+    if (!db_val('SELECT COUNT(*) FROM payslips WHERE run_id = ?', [$runId])) {
+        json_err('Compute the register before approving.', 422);
+    }
+    db_query("UPDATE payroll_runs SET status = 'Approved', approved_by = ?, approved_at = NOW() WHERE id = ?", [(int)current_user()['id'], $runId]);
+
+    // Apply loan repayments once, at approval, reducing outstanding balances.
+    foreach (db_all('SELECT person_id, breakdown FROM payslips WHERE run_id = ?', [$runId]) as $ps) {
+        $breakdown = $ps['breakdown'] ? json_decode($ps['breakdown'], true) : [];
+        foreach ($breakdown['deductions'] ?? [] as $ded) {
+            if (empty($ded['loan_id'])) {
+                continue;
+            }
+            $loan = db_row('SELECT * FROM staff_loans WHERE id = ?', [(int)$ded['loan_id']]);
+            if (!$loan || $loan['status'] !== 'Active') {
+                continue;
+            }
+            $newBalance = max(0, (float)$loan['outstanding_balance'] - (float)$ded['amount']);
+            $newStatus = $newBalance <= 0 ? 'Cleared' : 'Active';
+            db_query('UPDATE staff_loans SET outstanding_balance = ?, status = ? WHERE id = ?', [$newBalance, $newStatus, (int)$loan['id']]);
+        }
+    }
+    audit('payroll_run.approve', 'payroll_run', $runId, []);
+    json_ok();
+}
+
+function pay_run(string $id): void
+{
+    if (!payroll_can_approve()) {
+        json_err('You do not have permission to mark payroll paid.', 403);
+    }
+    $runId = (int)$id;
+    $r = db_row('SELECT * FROM payroll_runs WHERE id = ?', [$runId]);
+    if (!$r) {
+        json_err('That run does not exist.', 404);
+    }
+    if ($r['status'] !== 'Approved') {
+        json_err('Only an approved run can be marked paid.', 409);
+    }
+    db_query("UPDATE payroll_runs SET status = 'Paid', paid_at = NOW() WHERE id = ?", [$runId]);
+    // Notify each employee that their payslip is available.
+    foreach (db_all('SELECT person_id FROM payslips WHERE run_id = ?', [$runId]) as $ps) {
+        notify_person((int)$ps['person_id'], 'Your payslip for ' . $r['period'] . ' is available.', '/payroll', 'payroll');
+    }
+    audit('payroll_run.paid', 'payroll_run', $runId, []);
+    json_ok();
+}
+
+function delete_run(string $id): void
+{
+    if (!payroll_can_manage()) {
+        json_err('You do not have permission to delete payroll runs.', 403);
+    }
+    $r = db_row('SELECT * FROM payroll_runs WHERE id = ?', [(int)$id]);
+    if (!$r) {
+        json_err('That run does not exist.', 404);
+    }
+    if ($r['status'] !== 'Draft') {
+        json_err('Only a draft run can be deleted.', 409);
+    }
+    db_query('DELETE FROM payroll_runs WHERE id = ?', [(int)$id]);
+    audit('payroll_run.delete', 'payroll_run', (int)$id, ['period' => $r['period']]);
+    json_ok();
+}
+
+// ---------------------------------------------------------------------------
+// Payslips
+// ---------------------------------------------------------------------------
+
+// A payslip is visible to its owner only once the run is approved or paid;
+// payroll.view_all sees any payslip, including a draft register.
+function payslip_row_or_403(int $payslipId): array
+{
+    $ps = db_row(
+        "SELECT ps.*, r.period, r.status AS run_status, r.label AS run_label,
+                COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))),''), CONCAT('#', ps.person_id)) AS person_name,
+                p.job_title, p.department
+         FROM payslips ps JOIN payroll_runs r ON r.id = ps.run_id JOIN people p ON p.id = ps.person_id
+         WHERE ps.id = ?",
+        [$payslipId]
+    );
+    if (!$ps) {
+        render_error(404, 'Not found', 'That payslip does not exist.');
+    }
+    $isOwn = (int)$ps['person_id'] === payroll_my_pid();
+    $allowed = payroll_can_view_all() || ($isOwn && in_array($ps['run_status'], ['Approved', 'Paid'], true));
+    if (!$allowed) {
+        render_error(403, 'Access denied', 'This payslip is not available to you yet.');
+    }
+    return $ps;
+}
+
+function payslip(string $id): void
+{
+    $ps = payslip_row_or_403((int)$id);
+    render('payroll/payslip', [
+        'pageTitle' => 'Payslip ' . $ps['period'],
+        'payslip' => $ps,
+        'breakdown' => $ps['breakdown'] ? json_decode($ps['breakdown'], true) : ['earnings' => [], 'deductions' => []],
+        'profile' => company_profile(),
+        'currency' => setting('currency', 'MWK'),
+    ], false);
+}
+
+function email_payslip(string $id): void
+{
+    if (!payroll_can_view_all()) {
+        json_err('You do not have permission to send payslips.', 403);
+    }
+    $ps = db_row('SELECT ps.*, r.period, r.status AS run_status FROM payslips ps JOIN payroll_runs r ON r.id = ps.run_id WHERE ps.id = ?', [(int)$id]);
+    if (!$ps) {
+        json_err('That payslip does not exist.', 404);
+    }
+    if (!in_array($ps['run_status'], ['Approved', 'Paid'], true)) {
+        json_err('Approve the run before distributing payslips.', 409);
+    }
+    $curr = setting('currency', 'MWK');
+    $body = '<p>Your payslip for ' . e($ps['period']) . ' is ready.</p>'
+        . '<p>Gross ' . e($curr) . ' ' . number_format((float)$ps['gross'], 2)
+        . ', deductions ' . e($curr) . ' ' . number_format((float)$ps['total_deductions'], 2)
+        . ', net pay ' . e($curr) . ' ' . number_format((float)$ps['net_pay'], 2) . '.</p>';
+    mail_person((int)$ps['person_id'], 'Payslip for ' . $ps['period'], $body);
+    audit('payslip.email', 'payslip', (int)$id, []);
+    json_ok();
+}
+
+// ---------------------------------------------------------------------------
+// Staff loans and advances
+// ---------------------------------------------------------------------------
+
+function loans(): void
+{
+    if (!payroll_can_manage()) {
+        render_error(403, 'Access denied', 'You do not have permission to manage loans.');
+    }
+    render('payroll/loans', [
+        'pageTitle' => 'Staff loans',
+        'breadcrumbs' => ['People' => null, 'Payroll' => '/payroll', 'Loans' => null],
+        'loans' => db_all(
+            "SELECT l.*, COALESCE(NULLIF(TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))),''), CONCAT('#', l.person_id)) AS person_name
+             FROM staff_loans l JOIN people p ON p.id = l.person_id ORDER BY FIELD(l.status,'Pending','Active','Cleared','Rejected'), l.id DESC"
+        ),
+        'people' => db_all("SELECT id, first_name, last_name FROM people WHERE employment_status = 'Active' ORDER BY first_name"),
+        'canApprove' => payroll_can_approve(),
+        'currency' => setting('currency', 'MWK'),
+    ]);
+}
+
+function create_loan(): void
+{
+    if (!payroll_can_manage()) {
+        json_err('You do not have permission to create loans.', 403);
+    }
+    $personId = in_int('person_id');
+    if (!$personId || !db_val('SELECT id FROM people WHERE id = ?', [$personId])) {
+        json_err('Choose a valid person.', 422, ['person_id' => 'Invalid person.']);
+    }
+    foreach (['principal', 'installment'] as $n) {
+        if (in_str($n) === '' || !is_numeric(in_str($n)) || (float)in_str($n) <= 0) {
+            json_err('Enter a positive number.', 422, [$n => 'Enter a positive number.']);
+        }
+    }
+    db_query(
+        'INSERT INTO staff_loans (person_id, principal, installment, outstanding_balance, reason, status, created_by) VALUES (?,?,?,?,?,?,?)',
+        [$personId, (float)in_str('principal'), (float)in_str('installment'), (float)in_str('principal'), in_str('reason') ?: null, 'Pending', (int)current_user()['id']]
+    );
+    $loanId = db_insert_id();
+    audit('staff_loan.create', 'staff_loan', $loanId, ['person_id' => $personId, 'principal' => (float)in_str('principal')]);
+    json_ok(['loan_id' => $loanId]);
+}
+
+function decide_loan(string $id): void
+{
+    if (!payroll_can_approve()) {
+        json_err('You do not have permission to approve loans.', 403);
+    }
+    $loan = db_row('SELECT * FROM staff_loans WHERE id = ?', [(int)$id]);
+    if (!$loan) {
+        json_err('That loan does not exist.', 404);
+    }
+    if ($loan['status'] !== 'Pending') {
+        json_err('That loan has already been decided.', 409);
+    }
+    $decision = in_str('decision');
+    if (!in_array($decision, ['Active', 'Rejected'], true)) {
+        json_err('Choose approve or reject.', 422);
+    }
+    db_query(
+        'UPDATE staff_loans SET status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?',
+        [$decision, (int)current_user()['id'], (int)$id]
+    );
+    if ($decision === 'Active') {
+        notify_person((int)$loan['person_id'], 'Your staff loan was approved and will be deducted from payroll.', '/payroll', 'payroll');
+    }
+    audit('staff_loan.decide', 'staff_loan', (int)$id, ['decision' => $decision]);
+    json_ok();
+}
+
+// Payslips for the current user, for the payroll home page. Only from approved
+// or paid runs.
+function my_payslips(int $personId): array
+{
+    if ($personId <= 0) {
+        return [];
+    }
+    return db_all(
+        "SELECT ps.id, ps.gross, ps.total_deductions, ps.net_pay, r.period, r.status
+         FROM payslips ps JOIN payroll_runs r ON r.id = ps.run_id
+         WHERE ps.person_id = ? AND r.status IN ('Approved','Paid') ORDER BY r.period DESC",
+        [$personId]
+    );
 }

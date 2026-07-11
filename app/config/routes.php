@@ -217,6 +217,18 @@ return [
     ['POST',   '/payroll/components',             'payroll@add_component',        ['auth', 'csrf', 'rbac:payroll.manage']],
     ['PATCH',  '/payroll/components/{id}',        'payroll@update_component',     ['auth', 'csrf', 'rbac:payroll.manage']],
     ['DELETE', '/payroll/components/{id}',        'payroll@delete_component',     ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['GET',    '/payroll/runs',                   'payroll@runs',                 ['auth', 'rbac:payroll.view_all', 'module:payroll']],
+    ['GET',    '/payroll/runs/{id}',              'payroll@run',                  ['auth', 'rbac:payroll.view_all', 'module:payroll']],
+    ['POST',   '/payroll/runs',                   'payroll@create_run',           ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['POST',   '/payroll/runs/{id}/compute',      'payroll@compute_run',          ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['POST',   '/payroll/runs/{id}/approve',      'payroll@approve_run',          ['auth', 'csrf', 'rbac:payroll.approve']],
+    ['POST',   '/payroll/runs/{id}/pay',          'payroll@pay_run',              ['auth', 'csrf', 'rbac:payroll.approve']],
+    ['DELETE', '/payroll/runs/{id}',              'payroll@delete_run',           ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['GET',    '/payroll/payslips/{id}',          'payroll@payslip',              ['auth', 'rbac:payroll.view_own', 'module:payroll']],
+    ['POST',   '/payroll/payslips/{id}/email',    'payroll@email_payslip',        ['auth', 'csrf', 'rbac:payroll.view_all']],
+    ['GET',    '/payroll/loans',                  'payroll@loans',                ['auth', 'rbac:payroll.manage', 'module:payroll']],
+    ['POST',   '/payroll/loans',                  'payroll@create_loan',          ['auth', 'csrf', 'rbac:payroll.manage']],
+    ['POST',   '/payroll/loans/{id}/decide',      'payroll@decide_loan',          ['auth', 'csrf', 'rbac:payroll.approve']],
 
     // Expenses and petty cash
     ['GET',    '/expenses',                       'expenses@index',               ['auth', 'rbac:expenses.submit', 'module:expenses']],

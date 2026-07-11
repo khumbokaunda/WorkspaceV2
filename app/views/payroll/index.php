@@ -10,7 +10,11 @@ $fmt = fn($v) => $v === null || $v === '' ? 'Not set' : $currency . ' ' . number
         <a href="/payroll/records/<?= (int)$myPid ?>" class="btn btn-outline-primary"><i class="fa-solid fa-id-card me-2"></i>My records</a>
 <?php endif; ?>
 <?php if ($canManage): ?>
-        <a href="/payroll/components" class="btn btn-primary"><i class="fa-solid fa-sliders me-2"></i>Pay components</a>
+        <a href="/payroll/components" class="btn btn-outline-primary"><i class="fa-solid fa-sliders me-2"></i>Pay components</a>
+        <a href="/payroll/loans" class="btn btn-outline-primary"><i class="fa-solid fa-hand-holding-dollar me-2"></i>Loans</a>
+<?php endif; ?>
+<?php if ($canViewAll): ?>
+        <a href="/payroll/runs" class="btn btn-primary"><i class="fa-solid fa-money-check-dollar me-2"></i>Payroll runs</a>
 <?php endif; ?>
     </div>
 </div>
@@ -21,6 +25,32 @@ $fmt = fn($v) => $v === null || $v === '' ? 'Not set' : $currency . ' ' . number
         <p class="mb-0 text-muted" style="font-size:12px">Statutory calculation mode: <strong><?= e(ucfirst($statutoryMode)) ?></strong>. In simple mode the module records salaries and issues payslips; in full mode it applies the configured statutory deductions.</p>
     </div>
 </div>
+
+<?php if ($myPid): ?>
+<div class="mx-card mb-3">
+    <div class="mx-card-header"><h2>My payslips</h2></div>
+    <div class="mx-card-body mx-flush">
+<?php if (!$myPayslips): ?>
+        <div class="mx-empty py-4"><i class="fa-solid fa-file-invoice-dollar"></i><p class="mb-0">No payslips available yet. They appear once a payroll run is approved.</p></div>
+<?php else: ?>
+        <div class="table-responsive"><table class="table align-middle mb-0" style="font-size:13px">
+            <thead><tr><th>Period</th><th class="text-end">Gross</th><th class="text-end">Deductions</th><th class="text-end">Net pay</th><th></th></tr></thead>
+            <tbody>
+<?php foreach ($myPayslips as $ps): ?>
+                <tr>
+                    <td class="mx-tabular"><?= e($ps['period']) ?></td>
+                    <td class="text-end mx-tabular"><?= e($fmt($ps['gross'])) ?></td>
+                    <td class="text-end mx-tabular"><?= e($fmt($ps['total_deductions'])) ?></td>
+                    <td class="text-end mx-tabular"><strong><?= e($fmt($ps['net_pay'])) ?></strong></td>
+                    <td class="text-end"><a href="/payroll/payslips/<?= (int)$ps['id'] ?>" target="_blank" rel="noopener" class="btn btn-subtle btn-sm"><i class="fa-solid fa-file-lines me-1"></i>View</a></td>
+                </tr>
+<?php endforeach; ?>
+            </tbody>
+        </table></div>
+<?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($canViewAll): ?>
 <div class="mx-card">
