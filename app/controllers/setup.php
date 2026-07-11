@@ -170,9 +170,19 @@ function submit(): void
         );
     }
 
-    // Repurpose the seeded administrator as the company's first admin.
-    $adminRoleId = (int)db_val("SELECT id FROM roles WHERE role_key = 'admin'");
-    $existingAdmin = db_row('SELECT id, person_id FROM users WHERE role_id = ? ORDER BY id LIMIT 1', [$adminRoleId]);
+    // Repurpose the existing administrator as the company's first admin. Access
+    // comes from groups now, so an administrator is any member of the
+    // Administrators group; this is the account a fresh install or a factory
+    // reset leaves in place. If somehow none exists, create one and place it in
+    // the Administrators group and a primary department, so the setup flow works
+    // whether or not an admin is already present.
+    $adminGroupId = (int)db_val("SELECT id FROM `groups` WHERE group_key = 'administrators'");
+    $existingAdmin = db_row(
+        'SELECT u.id, u.person_id FROM users u
+         JOIN user_groups ug ON ug.user_id = u.id
+         WHERE ug.group_id = ? ORDER BY u.id LIMIT 1',
+        [$adminGroupId]
+    ) ?: db_row('SELECT id, person_id FROM users ORDER BY id LIMIT 1');
     $hash = password_hash($adminPass, PASSWORD_BCRYPT);
     if ($existingAdmin) {
         db_query(
@@ -185,10 +195,23 @@ function submit(): void
         $adminId = (int)$existingAdmin['id'];
     } else {
         db_query(
-            'INSERT INTO users (username, email, password_hash, role_id, is_active, must_change_password) VALUES (?,?,?,?,1,0)',
-            [$adminUser, $adminEmail, $hash, $adminRoleId]
+            'INSERT INTO users (username, email, password_hash, role_id, is_active, must_change_password) VALUES (?,?,?,NULL,1,0)',
+            [$adminUser, $adminEmail, $hash]
         );
         $adminId = db_insert_id();
+    }
+    // Ensure the account carries administrator standing and a primary department.
+    if ($adminGroupId) {
+        db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,0)', [$adminId, $adminGroupId]);
+    }
+    if (!db_val('SELECT 1 FROM user_groups WHERE user_id = ? AND is_primary = 1', [$adminId])) {
+        $deptId = (int)db_val(
+            "SELECT id FROM `groups` WHERE type = 'department' AND is_active = 1
+             ORDER BY group_key = 'management' DESC, group_key = 'general' DESC, sort_order LIMIT 1"
+        );
+        if ($deptId) {
+            db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,1)', [$adminId, $deptId]);
+        }
     }
 
     // Access comes from groups. Make the first administrator a member of the
