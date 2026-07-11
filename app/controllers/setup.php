@@ -24,6 +24,7 @@ function setup_optional_modules(): array
         'budgets'        => 'Department budgets that requisitions and purchase orders draw against.',
         'expenses'       => 'Expense claims with receipts and approval, and a petty cash float with a running balance.',
         'payroll'        => 'Personal records, a configurable pay component engine, salary structures, payroll runs, payslips and staff loans.',
+        'contracts'      => 'Contracts and agreements with renewal alerts and the signed contract file.',
     ];
 }
 

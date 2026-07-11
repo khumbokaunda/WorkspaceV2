@@ -248,6 +248,15 @@ return [
     ['POST',   '/expenses/petty-cash',            'expenses@add_petty_entry',     ['auth', 'csrf', 'rbac:pettycash.manage']],
     ['DELETE', '/expenses/petty-cash/{id}',       'expenses@delete_petty_entry',  ['auth', 'csrf', 'rbac:pettycash.manage']],
 
+    // Contracts and renewals
+    ['GET',    '/contracts',                      'contracts@index',              ['auth', 'rbac:contracts.view', 'module:contracts']],
+    ['GET',    '/api/contracts',                  'contracts@list_json',          ['auth', 'rbac:contracts.view']],
+    ['POST',   '/contracts',                      'contracts@create',             ['auth', 'csrf', 'rbac:contracts.manage']],
+    ['PATCH',  '/contracts/{id}',                 'contracts@update',             ['auth', 'csrf', 'rbac:contracts.manage']],
+    ['DELETE', '/contracts/{id}',                 'contracts@destroy',            ['auth', 'csrf', 'rbac:contracts.manage']],
+    ['POST',   '/contracts/{id}/file-link',       'contracts@file_link',          ['auth', 'csrf', 'rbac:contracts.view']],
+    ['GET',    '/contracts/file/{token}',         'contracts@download',           ['auth', 'rbac:contracts.view']],
+
     // Admin
     ['GET',    '/admin/users',                'admin_users@index',          ['auth', 'rbac:admin.users', 'module:admin_users']],
     ['POST',   '/admin/users',                'admin_users@create',         ['auth', 'csrf', 'rbac:admin.users']],

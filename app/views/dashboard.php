@@ -274,6 +274,28 @@ function mx_task_chip(string $priority): string
     </div>
 <?php endif; ?>
 
+<?php if (isset($widgets['contract_renewals'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Contract renewals</h2><a href="/contracts" class="btn btn-subtle btn-sm">Contracts</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['contract_renewals']): ?>
+                <div class="mx-empty"><i class="fa-solid fa-file-contract"></i><p class="mb-0">No contracts up for renewal soon.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['contract_renewals'] as $c): $days = (int)$c['days_left']; ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <div class="flex-grow-1 text-truncate" style="font-size:13px"><?= e($c['title']) ?><span class="text-muted d-block" style="font-size:11px"><?= e($c['counterparty'] ?: '') ?></span></div>
+                        <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 14 ? 'mx-chip-warning' : 'mx-chip-info') ?>"><?= $days < 0 ? 'Expired' : $days . ' days' ?></span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (isset($widgets['task_throughput'])): $tt = $widgets['task_throughput']; $total = max(1, array_sum($tt)); ?>
     <div class="col-12 col-lg-4">
         <div class="mx-card h-100">

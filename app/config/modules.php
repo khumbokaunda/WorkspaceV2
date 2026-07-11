@@ -23,6 +23,7 @@ return [
 
     // Navigation: Company
     'company_docs'   => ['nav' => true,  'section' => 'Company','label' => 'Compliance Library',     'icon' => 'fa-folder-tree',     'path' => '/company/documents', 'permission' => 'company_docs.view'],
+    'contracts'      => ['nav' => true,  'section' => 'Company','label' => 'Contracts',              'icon' => 'fa-file-contract',   'path' => '/contracts',      'permission' => 'contracts.view'],
 
     // Navigation: Procurement
     'suppliers'      => ['nav' => true,  'section' => 'Procurement', 'label' => 'Suppliers',         'icon' => 'fa-truck-field',     'path' => '/suppliers',      'permission' => 'suppliers.view'],
@@ -54,4 +55,5 @@ return [
     'widget.tender_deadlines'  => ['nav' => false, 'label' => 'Tender deadlines',        'permission' => 'tenders.view'],
     'widget.procurement_approvals' => ['nav' => false, 'label' => 'Requisition approvals', 'permission' => 'procurement.approve'],
     'widget.expense_approvals' => ['nav' => false, 'label' => 'Expense approvals',       'permission' => 'expenses.approve'],
+    'widget.contract_renewals' => ['nav' => false, 'label' => 'Contract renewals',       'permission' => 'contracts.view'],
 ];

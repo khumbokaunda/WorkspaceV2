@@ -118,6 +118,16 @@ function index(): void
         );
     }
 
+    if (module_visible('widget.contract_renewals') && module_enabled('contracts')) {
+        $widgets['contract_renewals'] = db_all(
+            "SELECT id, title, counterparty, end_date, DATEDIFF(end_date, CURDATE()) AS days_left
+             FROM contracts
+             WHERE status = 'Active' AND end_date IS NOT NULL
+               AND end_date <= DATE_ADD(CURDATE(), INTERVAL renewal_reminder_days DAY)
+             ORDER BY end_date LIMIT 6"
+        );
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,
