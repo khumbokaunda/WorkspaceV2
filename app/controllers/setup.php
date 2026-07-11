@@ -29,6 +29,7 @@ function setup_optional_modules(): array
         'noticeboard'    => 'Internal announcements and a read-only library of company policies.',
         'helpdesk'       => 'A lightweight ticket system for staff to report IT or facilities issues.',
         'fleet'          => 'Vehicles with assignment and service, insurance and license expiry alerts.',
+        'bookings'       => 'A shared calendar for meeting rooms and equipment, with double-booking prevention.',
     ];
 }
 

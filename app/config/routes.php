@@ -273,6 +273,14 @@ return [
     ['POST',   '/noticeboard/policies/{id}/link', 'noticeboard@policy_link',       ['auth', 'csrf', 'rbac:noticeboard.view']],
     ['GET',    '/noticeboard/policies/file/{token}', 'noticeboard@download_policy', ['auth', 'rbac:noticeboard.view']],
 
+    // Meeting room and resource booking
+    ['GET',    '/bookings',                       'bookings@index',               ['auth', 'rbac:bookings.book', 'module:bookings']],
+    ['GET',    '/api/bookings',                   'bookings@list_json',           ['auth', 'rbac:bookings.book']],
+    ['POST',   '/bookings',                       'bookings@create_booking',      ['auth', 'csrf', 'rbac:bookings.book']],
+    ['DELETE', '/bookings/{id}',                  'bookings@cancel_booking',      ['auth', 'csrf', 'rbac:bookings.book']],
+    ['POST',   '/bookings/resources',             'bookings@save_resource',       ['auth', 'csrf', 'rbac:bookings.manage']],
+    ['DELETE', '/bookings/resources/{id}',        'bookings@delete_resource',     ['auth', 'csrf', 'rbac:bookings.manage']],
+
     // Fleet and vehicles
     ['GET',    '/fleet',                          'fleet@index',                  ['auth', 'rbac:fleet.view', 'module:fleet']],
     ['GET',    '/api/fleet',                      'fleet@list_json',              ['auth', 'rbac:fleet.view']],

@@ -13,6 +13,7 @@ return [
     'projects'       => ['nav' => true,  'section' => 'Work',   'label' => 'Projects and Tasks',     'icon' => 'fa-list-check',      'path' => '/projects',       'permission' => 'projects.view'],
     'timesheets'     => ['nav' => true,  'section' => 'Work',   'label' => 'Timesheets',             'icon' => 'fa-business-time',   'path' => '/timesheets',     'permission' => 'timesheets.log'],
     'helpdesk'       => ['nav' => true,  'section' => 'Work',   'label' => 'Helpdesk',               'icon' => 'fa-headset',         'path' => '/helpdesk',       'permission' => 'helpdesk.raise'],
+    'bookings'       => ['nav' => true,  'section' => 'Work',   'label' => 'Room Booking',           'icon' => 'fa-calendar-check',  'path' => '/bookings',       'permission' => 'bookings.book'],
 
     // Navigation: People
     'people'         => ['nav' => true,  'section' => 'People', 'label' => 'Directory',              'icon' => 'fa-users',           'path' => '/people',         'permission' => 'people.view'],
