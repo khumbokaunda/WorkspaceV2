@@ -170,3 +170,14 @@ INSERT IGNORE INTO user_groups (user_id, group_id, is_primary)
 SELECT u.id, g.id, 0
 FROM users u JOIN roles r ON r.id = u.role_id AND r.role_key NOT IN ('admin', 'manager', 'staff')
 JOIN `groups` g ON g.group_key = CONCAT('role_', r.role_key);
+
+-- ---------------------------------------------------------------------------
+-- Navigation for managing departments and access groups. Core admin modules,
+-- always enabled, gated by the admin.roles permission like the roles screen
+-- they sit beside.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO modules (module_key, is_enabled, is_core) VALUES
+    ('admin_departments',   1, 1),
+    ('admin_access_groups', 1, 1)
+ON DUPLICATE KEY UPDATE is_core = 1, is_enabled = 1;

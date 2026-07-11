@@ -45,6 +45,8 @@ return [
 
     // Navigation: Admin
     'admin_users'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Users and Access',       'icon' => 'fa-user-shield',     'path' => '/admin/users',    'permission' => 'admin.users'],
+    'admin_departments'   => ['nav' => true, 'section' => 'Admin', 'label' => 'Departments',        'icon' => 'fa-sitemap',         'path' => '/admin/departments',   'permission' => 'admin.roles'],
+    'admin_access_groups' => ['nav' => true, 'section' => 'Admin', 'label' => 'Access Groups',      'icon' => 'fa-user-lock',       'path' => '/admin/access-groups', 'permission' => 'admin.roles'],
     'admin_roles'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Roles and Permissions',  'icon' => 'fa-key',             'path' => '/admin/roles',    'permission' => 'admin.roles'],
     'admin_audit'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Audit Log',              'icon' => 'fa-clipboard-list',  'path' => '/admin/audit',    'permission' => 'admin.audit'],
     'admin_settings' => ['nav' => true,  'section' => 'Admin',  'label' => 'Settings',               'icon' => 'fa-gear',            'path' => '/admin/settings', 'permission' => 'admin.settings'],
