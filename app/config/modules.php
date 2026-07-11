@@ -20,6 +20,7 @@ return [
     'certifications' => ['nav' => true,  'section' => 'People', 'label' => 'Certifications',         'icon' => 'fa-certificate',     'path' => '/certifications', 'permission' => 'certifications.view'],
     'payroll'        => ['nav' => true,  'section' => 'People', 'label' => 'Payroll and HR',         'icon' => 'fa-money-check-dollar', 'path' => '/payroll',     'permission' => 'payroll.view_own'],
     'appraisals'     => ['nav' => true,  'section' => 'People', 'label' => 'Appraisals',             'icon' => 'fa-star-half-stroke',  'path' => '/appraisals',  'permission' => 'appraisals.view_own'],
+    'training'       => ['nav' => true,  'section' => 'People', 'label' => 'Training',               'icon' => 'fa-graduation-cap',  'path' => '/training',       'permission' => 'training.view_own'],
 
     // Navigation: Sales
     'clients'        => ['nav' => true,  'section' => 'Sales',  'label' => 'Clients',                'icon' => 'fa-handshake',       'path' => '/clients',        'permission' => 'clients.view'],

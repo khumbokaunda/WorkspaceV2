@@ -31,6 +31,7 @@ function setup_optional_modules(): array
         'fleet'          => 'Vehicles with assignment and service, insurance and license expiry alerts.',
         'bookings'       => 'A shared calendar for meeting rooms and equipment, with double-booking prevention.',
         'appraisals'     => 'Performance review cycles with goals and ratings per employee.',
+        'training'       => 'Courses and certifications in progress, linked to the certifications module.',
     ];
 }
 

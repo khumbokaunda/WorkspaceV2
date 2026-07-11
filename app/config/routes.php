@@ -273,6 +273,13 @@ return [
     ['POST',   '/noticeboard/policies/{id}/link', 'noticeboard@policy_link',       ['auth', 'csrf', 'rbac:noticeboard.view']],
     ['GET',    '/noticeboard/policies/file/{token}', 'noticeboard@download_policy', ['auth', 'rbac:noticeboard.view']],
 
+    // Training and development
+    ['GET',    '/training',                       'training@index',               ['auth', 'rbac:training.view_own', 'module:training']],
+    ['GET',    '/api/training',                   'training@list_json',           ['auth', 'rbac:training.view_own']],
+    ['POST',   '/training',                       'training@create',              ['auth', 'csrf', 'rbac:training.view_own']],
+    ['PATCH',  '/training/{id}',                  'training@update',              ['auth', 'csrf', 'rbac:training.view_own']],
+    ['DELETE', '/training/{id}',                  'training@destroy',             ['auth', 'csrf', 'rbac:training.view_own']],
+
     // Performance and appraisals
     ['GET',    '/appraisals',                     'appraisals@index',             ['auth', 'rbac:appraisals.view_own', 'module:appraisals']],
     ['GET',    '/appraisals/{id}',                'appraisals@show',              ['auth', 'rbac:appraisals.view_own', 'module:appraisals']],
