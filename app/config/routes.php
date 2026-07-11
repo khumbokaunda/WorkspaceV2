@@ -273,6 +273,15 @@ return [
     ['POST',   '/noticeboard/policies/{id}/link', 'noticeboard@policy_link',       ['auth', 'csrf', 'rbac:noticeboard.view']],
     ['GET',    '/noticeboard/policies/file/{token}', 'noticeboard@download_policy', ['auth', 'rbac:noticeboard.view']],
 
+    // Fleet and vehicles
+    ['GET',    '/fleet',                          'fleet@index',                  ['auth', 'rbac:fleet.view', 'module:fleet']],
+    ['GET',    '/api/fleet',                      'fleet@list_json',              ['auth', 'rbac:fleet.view']],
+    ['GET',    '/api/fleet/{id}',                 'fleet@detail_json',            ['auth', 'rbac:fleet.view']],
+    ['POST',   '/fleet',                          'fleet@create',                 ['auth', 'csrf', 'rbac:fleet.manage']],
+    ['PATCH',  '/fleet/{id}',                     'fleet@update',                 ['auth', 'csrf', 'rbac:fleet.manage']],
+    ['DELETE', '/fleet/{id}',                     'fleet@destroy',                ['auth', 'csrf', 'rbac:fleet.manage']],
+    ['POST',   '/fleet/{id}/logs',                'fleet@add_log',                ['auth', 'csrf', 'rbac:fleet.manage']],
+
     // Contracts and renewals
     ['GET',    '/contracts',                      'contracts@index',              ['auth', 'rbac:contracts.view', 'module:contracts']],
     ['GET',    '/api/contracts',                  'contracts@list_json',          ['auth', 'rbac:contracts.view']],

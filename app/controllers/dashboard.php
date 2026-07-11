@@ -135,6 +135,19 @@ function index(): void
         );
     }
 
+    if (module_visible('widget.fleet_expiries') && module_enabled('fleet')) {
+        // Vehicles whose service, insurance or license falls due within 30 days.
+        $widgets['fleet_expiries'] = db_all(
+            "SELECT registration, label, due, DATEDIFF(due, CURDATE()) AS days_left FROM (
+                SELECT registration, 'Service' AS label, service_due AS due FROM vehicles WHERE status <> 'Retired' AND service_due IS NOT NULL
+                UNION ALL
+                SELECT registration, 'Insurance', insurance_expiry FROM vehicles WHERE status <> 'Retired' AND insurance_expiry IS NOT NULL
+                UNION ALL
+                SELECT registration, 'License', license_expiry FROM vehicles WHERE status <> 'Retired' AND license_expiry IS NOT NULL
+             ) x WHERE due <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY due LIMIT 6"
+        );
+    }
+
     if (module_visible('widget.approvals') && module_enabled('leave')) {
         $widgets['approvals'] = db_all(
             "SELECT lr.id, lr.start_date, lr.end_date, lr.working_days, lt.name AS type_name,

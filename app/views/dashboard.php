@@ -320,6 +320,29 @@ function mx_task_chip(string $priority): string
     </div>
 <?php endif; ?>
 
+<?php if (isset($widgets['fleet_expiries'])): ?>
+    <div class="col-12 col-lg-4">
+        <div class="mx-card h-100">
+            <div class="mx-card-header"><h2>Fleet expiries</h2><a href="/fleet" class="btn btn-subtle btn-sm">Fleet</a></div>
+            <div class="mx-card-body mx-flush">
+<?php if (!$widgets['fleet_expiries']): ?>
+                <div class="mx-empty"><i class="fa-solid fa-car"></i><p class="mb-0">Nothing due in the next 30 days.</p></div>
+<?php else: ?>
+                <ul class="list-unstyled m-0">
+<?php foreach ($widgets['fleet_expiries'] as $v): $days = (int)$v['days_left']; ?>
+                    <li class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                        <span class="mx-chip mx-chip-plain"><?= e($v['label']) ?></span>
+                        <div class="flex-grow-1 mx-mono" style="font-size:13px"><?= e($v['registration']) ?></div>
+                        <span class="mx-chip <?= $days < 0 ? 'mx-chip-danger' : ($days <= 7 ? 'mx-chip-warning' : 'mx-chip-info') ?>"><?= $days < 0 ? 'Overdue' : $days . ' days' ?></span>
+                    </li>
+<?php endforeach; ?>
+                </ul>
+<?php endif; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (isset($widgets['task_throughput'])): $tt = $widgets['task_throughput']; $total = max(1, array_sum($tt)); ?>
     <div class="col-12 col-lg-4">
         <div class="mx-card h-100">

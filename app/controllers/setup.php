@@ -28,6 +28,7 @@ function setup_optional_modules(): array
         'timesheets'     => 'Hours logged against projects and tasks, with a billable flag and utilisation.',
         'noticeboard'    => 'Internal announcements and a read-only library of company policies.',
         'helpdesk'       => 'A lightweight ticket system for staff to report IT or facilities issues.',
+        'fleet'          => 'Vehicles with assignment and service, insurance and license expiry alerts.',
     ];
 }
 

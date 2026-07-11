@@ -38,6 +38,7 @@ return [
 
     // Navigation: Assets
     'assets'         => ['nav' => true,  'section' => 'Assets', 'label' => 'Asset Register',         'icon' => 'fa-laptop',          'path' => '/assets',         'permission' => 'assets.view'],
+    'fleet'          => ['nav' => true,  'section' => 'Assets', 'label' => 'Fleet',                  'icon' => 'fa-car',             'path' => '/fleet',          'permission' => 'fleet.view'],
 
     // Navigation: Admin
     'admin_users'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Users and Access',       'icon' => 'fa-user-shield',     'path' => '/admin/users',    'permission' => 'admin.users'],
@@ -60,4 +61,5 @@ return [
     'widget.expense_approvals' => ['nav' => false, 'label' => 'Expense approvals',       'permission' => 'expenses.approve'],
     'widget.contract_renewals' => ['nav' => false, 'label' => 'Contract renewals',       'permission' => 'contracts.view'],
     'widget.helpdesk_queue'    => ['nav' => false, 'label' => 'Helpdesk queue',          'permission' => 'helpdesk.manage'],
+    'widget.fleet_expiries'    => ['nav' => false, 'label' => 'Fleet expiries',          'permission' => 'fleet.view'],
 ];

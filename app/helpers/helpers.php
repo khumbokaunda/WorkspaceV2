@@ -423,6 +423,7 @@ function module_for_permission(string $permissionKey): ?string
         'timesheets'     => 'timesheets',
         'noticeboard'    => 'noticeboard',
         'helpdesk'       => 'helpdesk',
+        'fleet'          => 'fleet',
     ];
     $prefix = explode('.', $permissionKey, 2)[0];
     return $map[$prefix] ?? null;
