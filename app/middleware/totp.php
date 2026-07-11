@@ -15,8 +15,8 @@ function middleware_totp(?string $arg = null): void
     if (!$user) {
         return; // auth middleware handles the unauthenticated case
     }
-    if (($user['role_key'] ?? '') !== 'admin') {
-        return;
+    if (!user_is_admin($user)) {
+        return; // the requirement targets administrators (system.admin holders)
     }
     if (setting('totp_required_admin', '0') !== '1') {
         return;

@@ -16,11 +16,14 @@ const THROTTLE_FREE_FAILURES_IP    = 20;
 
 function throttle_is_admin_username(string $username): bool
 {
-    $roleKey = db_val(
-        'SELECT r.role_key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.username = ?',
+    // An administrator is an active member of the Administrators access group.
+    return (bool)db_val(
+        "SELECT 1 FROM users u
+         JOIN user_groups ug ON ug.user_id = u.id
+         JOIN `groups` g ON g.id = ug.group_id
+         WHERE u.username = ? AND g.group_key = 'administrators'",
         [$username]
     );
-    return $roleKey === 'admin';
 }
 
 // Seconds the caller must still wait, or 0 when the attempt may proceed.

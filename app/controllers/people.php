@@ -23,7 +23,8 @@ function index(): void
         'breadcrumbs' => ['People' => null, 'Directory' => null],
         'departments' => db_all("SELECT DISTINCT department FROM people WHERE department IS NOT NULL AND department <> '' ORDER BY department"),
         'managers' => db_all("SELECT id, first_name, last_name FROM people WHERE employment_status = 'Active' ORDER BY first_name"),
-        'roles' => user_can('admin.users') ? db_all('SELECT id, display_name FROM roles ORDER BY id') : [],
+        'accountDepartments' => user_can('admin.users') ? db_all("SELECT id, name FROM `groups` WHERE type = 'department' AND is_active = 1 ORDER BY name") : [],
+        'accountAccessGroups' => user_can('admin.users') ? db_all("SELECT id, name FROM `groups` WHERE type = 'access_group' AND is_active = 1 ORDER BY sort_order, name") : [],
         'starterAssets' => user_can('assets.assign')
             ? db_all("SELECT id, asset_tag, name FROM assets WHERE status = 'Available' ORDER BY asset_tag")
             : [],
@@ -117,12 +118,27 @@ function create(): void
     // Validate the optional account before touching the database, so a
     // rejected account never leaves an orphan person behind.
     $wantsAccount = !empty($in['create_account']) && user_can('admin.users');
+    $accountDeptId = null;
+    $accountAccessIds = [];
     if ($wantsAccount) {
-        if (in_str('username') === '' || !in_int('role_id')) {
-            json_err('A username and role are required to create the account.', 422, ['username' => 'Required for an account.']);
+        $accountDeptId = in_int('primary_department');
+        if (in_str('username') === '' || !$accountDeptId) {
+            json_err('A username and primary department are required to create the account.', 422, ['username' => 'Required for an account.']);
+        }
+        if (!db_val("SELECT id FROM `groups` WHERE id = ? AND type = 'department' AND is_active = 1", [$accountDeptId])) {
+            json_err('Choose a valid primary department.', 422, ['primary_department' => 'Invalid department.']);
         }
         if (db_val('SELECT id FROM users WHERE username = ? OR email = ?', [in_str('username'), in_str('email')])) {
             json_err('That username or email already has an account.', 422, ['username' => 'Already taken.']);
+        }
+        $rawAccess = is_array($in['access_group_ids'] ?? null) ? array_map('intval', $in['access_group_ids']) : [];
+        if ($rawAccess) {
+            $place = implode(',', array_fill(0, count($rawAccess), '?'));
+            $validAccess = array_map(
+                fn($r) => (int)$r['id'],
+                db_all("SELECT id FROM `groups` WHERE type = 'access_group' AND id IN ($place)", $rawAccess)
+            );
+            $accountAccessIds = array_values(array_intersect($rawAccess, $validAccess));
         }
     }
 
@@ -144,10 +160,20 @@ function create(): void
         $tempPassword = bin2hex(random_bytes(6)) . '!A';
         db_query(
             'INSERT INTO users (username, email, password_hash, person_id, role_id, must_change_password)
-             VALUES (?,?,?,?,?,1)',
-            [in_str('username'), in_str('email'), password_hash($tempPassword, PASSWORD_BCRYPT), $personId, in_int('role_id')]
+             VALUES (?,?,?,?,NULL,1)',
+            [in_str('username'), in_str('email'), password_hash($tempPassword, PASSWORD_BCRYPT), $personId]
         );
-        audit('user.create', 'user', db_insert_id(), ['username' => in_str('username'), 'via' => 'onboarding']);
+        $newUserId = db_insert_id();
+        db_query('INSERT INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,1)', [$newUserId, $accountDeptId]);
+        foreach ($accountAccessIds as $gid) {
+            db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,0)', [$newUserId, $gid]);
+        }
+        audit('user.create', 'user', $newUserId, [
+            'username' => in_str('username'),
+            'via' => 'onboarding',
+            'department' => $accountDeptId,
+            'access_groups' => $accountAccessIds,
+        ]);
     }
 
     if (!empty($in['starter_asset_id']) && user_can('assets.assign')) {

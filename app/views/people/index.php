@@ -46,7 +46,8 @@
 
 <script>
 var mxCanCreateAccount = <?= user_can('admin.users') ? 'true' : 'false' ?>;
-var mxRoles = <?= json_encode(array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['display_name']], $roles)) ?>;
+var mxAccountDepartments = <?= json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name']], $accountDepartments)) ?>;
+var mxAccountAccessGroups = <?= json_encode(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $accountAccessGroups)) ?>;
 var mxStarterAssets = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['id'], 'label' => $a['asset_tag'] . ' ' . $a['name']], $starterAssets)) ?>;
 var mxManagers = <?= json_encode(array_map(fn($m) => ['id' => (int)$m['id'], 'name' => $m['first_name'] . ' ' . $m['last_name']], $managers)) ?>;
 
@@ -100,10 +101,14 @@ function mxOpenOnboarding() {
             '<div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="create_account" id="ob-account"> <label class="form-check-label" for="ob-account">Create a login account</label></div>' +
             '<div id="ob-account-fields" style="display:none">' +
             '<div class="mb-3"><label class="form-label">Username</label><input class="form-control" name="username" maxlength="60"></div>' +
-            '<div class="mb-3"><label class="form-label">Role</label><select class="form-select" name="role_id">' +
-            mxRoles.map(function (r) { return '<option value="' + r.id + '">' + MX.escape(r.name) + '</option>'; }).join('') +
+            '<div class="mb-3"><label class="form-label">Primary department</label><select class="form-select" name="primary_department"><option value="">Choose a department</option>' +
+            mxAccountDepartments.map(function (d) { return '<option value="' + d.id + '">' + MX.escape(d.name) + '</option>'; }).join('') +
             '</select></div>' +
-            '<p class="text-muted" style="font-size:12px">A temporary password is generated and shown once. The person must change it at first sign in.</p>' +
+            (mxAccountAccessGroups.length ? '<div class="mb-3"><label class="form-label">Access groups <span class="text-muted" style="font-weight:400">(optional)</span></label>' +
+            '<div style="max-height:140px;overflow:auto;border:1px solid var(--mx-border);border-radius:8px;padding:8px 12px">' +
+            mxAccountAccessGroups.map(function (g) { return '<label class="d-flex align-items-center gap-2 py-1" style="font-size:13px"><input type="checkbox" class="form-check-input ob-access-box" value="' + g.id + '">' + MX.escape(g.name) + '</label>'; }).join('') +
+            '</div></div>' : '') +
+            '<p class="text-muted" style="font-size:12px">Access is the union of the department and any access groups. A temporary password is generated and shown once. The person must change it at first sign in.</p>' +
             '</div>';
     }
     var assetStep = '';
@@ -145,7 +150,9 @@ function mxOpenOnboarding() {
 function mxSubmitOnboarding() {
     var form = document.getElementById('ob-form');
     if (!form.reportValidity()) return;
-    MX.api('POST', '/people', MX.formData(form))
+    var payload = MX.formData(form);
+    payload.access_group_ids = Array.prototype.map.call(document.querySelectorAll('.ob-access-box:checked'), function (b) { return parseInt(b.value, 10); });
+    MX.api('POST', '/people', payload)
         .then(function (data) {
             MX.drawer.close();
             if (data.temp_password) {

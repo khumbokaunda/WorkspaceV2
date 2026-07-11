@@ -27,8 +27,10 @@ function index(): void
         'roleVis' => $roleVis,
         'moduleCatalog' => module_catalog(),
         'users' => db_all(
-            'SELECT u.id, u.username, r.display_name AS role_name FROM users u
-             JOIN roles r ON r.id = u.role_id WHERE u.is_active = 1 ORDER BY u.username'
+            "SELECT u.id, u.username,
+                    COALESCE((SELECT g.name FROM user_groups ug JOIN `groups` g ON g.id = ug.group_id
+                       WHERE ug.user_id = u.id AND ug.is_primary = 1 LIMIT 1), 'No department') AS role_name
+             FROM users u WHERE u.is_active = 1 ORDER BY u.username"
         ),
     ]);
 }
@@ -97,17 +99,27 @@ function user_access_json(string $id): void
 {
     $userId = (int)$id;
     $user = db_row(
-        'SELECT u.id, u.username, u.role_id, r.display_name AS role_name
-         FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?',
+        "SELECT u.id, u.username,
+                COALESCE((SELECT g.name FROM user_groups ug JOIN `groups` g ON g.id = ug.group_id
+                   WHERE ug.user_id = u.id AND ug.is_primary = 1 LIMIT 1), 'No department') AS role_name
+         FROM users u WHERE u.id = ?",
         [$userId]
     );
     if (!$user) {
         json_err('That account does not exist.', 404);
     }
 
-    $rolePermIds = [];
-    foreach (db_all('SELECT permission_id FROM role_permissions WHERE role_id = ?', [(int)$user['role_id']]) as $rp) {
-        $rolePermIds[(int)$rp['permission_id']] = true;
+    // What the user inherits from group membership, before overrides. This is
+    // the union of every group's permissions, the same set the resolver starts
+    // from.
+    $groupPermIds = [];
+    foreach (db_all(
+        'SELECT DISTINCT gp.permission_id
+         FROM user_groups ug JOIN group_permissions gp ON gp.group_id = ug.group_id
+         WHERE ug.user_id = ?',
+        [$userId]
+    ) as $gp) {
+        $groupPermIds[(int)$gp['permission_id']] = true;
     }
     $overrides = [];
     foreach (db_all('SELECT permission_id, effect FROM user_permission_overrides WHERE user_id = ?', [$userId]) as $o) {
@@ -116,24 +128,29 @@ function user_access_json(string $id): void
     $perms = [];
     foreach (db_all('SELECT id, permission_key, description FROM permissions ORDER BY permission_key') as $p) {
         $pid = (int)$p['id'];
-        $fromRole = isset($rolePermIds[$pid]);
+        $fromGroup = isset($groupPermIds[$pid]);
         $override = $overrides[$pid] ?? null;
         $perms[] = [
             'id' => $pid,
             'key' => $p['permission_key'],
             'description' => $p['description'],
-            'from_role' => $fromRole,
+            'from_role' => $fromGroup,
             'override' => $override,
-            'effective' => $override === 'grant' ? true : ($override === 'revoke' ? false : $fromRole),
+            'effective' => $override === 'grant' ? true : ($override === 'revoke' ? false : $fromGroup),
         ];
     }
 
-    $roleVis = [];
+    // Module default follows the group visibility rules (hide beats show), and
+    // where no group forces a decision it follows the permission the module
+    // needs. A per-user visibility row overrides all of that.
+    $groupVis = [];
     foreach (db_all(
-        "SELECT module_key, is_visible FROM module_visibility WHERE scope = 'role' AND scope_id = ?",
-        [(int)$user['role_id']]
+        'SELECT gmv.module_key, MIN(gmv.is_visible) AS is_visible
+         FROM user_groups ug JOIN group_module_visibility gmv ON gmv.group_id = ug.group_id
+         WHERE ug.user_id = ? GROUP BY gmv.module_key',
+        [$userId]
     ) as $mv) {
-        $roleVis[$mv['module_key']] = (bool)$mv['is_visible'];
+        $groupVis[$mv['module_key']] = (bool)$mv['is_visible'];
     }
     $userVis = [];
     foreach (db_all(
@@ -142,17 +159,20 @@ function user_access_json(string $id): void
     ) as $mv) {
         $userVis[$mv['module_key']] = (bool)$mv['is_visible'];
     }
+    // Effective permission set (with overrides) to derive the permission default.
+    $effectivePerms = user_permissions($user);
     $modules = [];
     foreach (module_catalog() as $key => $meta) {
-        $roleDefault = $roleVis[$key] ?? true;
+        $permDefault = empty($meta['permission']) || isset($effectivePerms['system.admin']) || isset($effectivePerms[$meta['permission']]);
+        $groupDefault = $groupVis[$key] ?? $permDefault;
         $override = array_key_exists($key, $userVis) ? $userVis[$key] : null;
         $modules[] = [
             'key' => $key,
             'label' => $meta['label'],
             'is_widget' => empty($meta['nav']),
-            'role_default' => $roleDefault,
+            'role_default' => $groupDefault,
             'override' => $override,
-            'effective' => $override ?? $roleDefault,
+            'effective' => $override ?? $groupDefault,
         ];
     }
     json_out(['ok' => true, 'user' => $user, 'permissions' => $perms, 'modules' => $modules]);
