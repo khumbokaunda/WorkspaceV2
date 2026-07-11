@@ -504,6 +504,37 @@ function setup_completed(): bool
     return setting('setup_completed', '0') === '1';
 }
 
+// Permissions that are never offered in the ordinary permission editors. These
+// are system identity that comes with being the protected Administrators group,
+// not access to be delegated to arbitrary groups or people.
+function restricted_permissions(): array
+{
+    return ['system.admin', 'system.reset'];
+}
+
+// The application version, recorded in archives and reset history.
+function app_version(): string
+{
+    return '1.0.0';
+}
+
+// The highest applied migration number, a coarse schema fingerprint used to
+// check archive compatibility on restore.
+function schema_migration_version(): int
+{
+    static $version = null;
+    if ($version !== null) {
+        return $version;
+    }
+    $version = 0;
+    foreach (glob(APP_ROOT . '/database/migrations/*.sql') ?: [] as $file) {
+        if (preg_match('/(\d+)/', basename($file), $m)) {
+            $version = max($version, (int)$m[1]);
+        }
+    }
+    return $version;
+}
+
 // Core modules that are always in the navigation regardless of visibility rules,
 // so no combination of settings can strand a user with no way to move.
 function core_visible_modules(): array

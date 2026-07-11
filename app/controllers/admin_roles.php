@@ -7,7 +7,12 @@ declare(strict_types=1);
 function index(): void
 {
     $roles = db_all('SELECT * FROM roles ORDER BY id');
-    $permissions = db_all('SELECT * FROM permissions ORDER BY permission_key');
+    $restricted = restricted_permissions();
+    $placeholders = implode(',', array_fill(0, count($restricted), '?'));
+    $permissions = db_all(
+        "SELECT * FROM permissions WHERE permission_key NOT IN ($placeholders) ORDER BY permission_key",
+        $restricted
+    );
 
     $rolePerms = [];
     foreach (db_all('SELECT role_id, permission_id FROM role_permissions') as $rp) {
@@ -125,8 +130,12 @@ function user_access_json(string $id): void
     foreach (db_all('SELECT permission_id, effect FROM user_permission_overrides WHERE user_id = ?', [$userId]) as $o) {
         $overrides[(int)$o['permission_id']] = $o['effect'];
     }
+    $restricted = restricted_permissions();
     $perms = [];
     foreach (db_all('SELECT id, permission_key, description FROM permissions ORDER BY permission_key') as $p) {
+        if (in_array($p['permission_key'], $restricted, true)) {
+            continue; // restricted permissions are not shown as per-person overrides
+        }
         $pid = (int)$p['id'];
         $fromGroup = isset($groupPermIds[$pid]);
         $override = $overrides[$pid] ?? null;
@@ -196,7 +205,14 @@ function save_user_overrides(string $id): void
     $in = input();
 
     $permOverrides = is_array($in['permission_overrides'] ?? null) ? $in['permission_overrides'] : [];
-    $validPerms = array_map(fn($p) => (int)$p['id'], db_all('SELECT id FROM permissions'));
+    // Valid permissions, excluding the restricted ones which are never granted
+    // or revoked per person.
+    $restricted = restricted_permissions();
+    $placeholders = implode(',', array_fill(0, count($restricted), '?'));
+    $validPerms = array_map(
+        fn($p) => (int)$p['id'],
+        db_all("SELECT id FROM permissions WHERE permission_key NOT IN ($placeholders)", $restricted)
+    );
     foreach ($permOverrides as $pid => $effect) {
         $pid = (int)$pid;
         if (!in_array($pid, $validPerms, true)) {

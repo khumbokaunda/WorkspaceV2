@@ -38,6 +38,17 @@ return [
         'from_email' => 'meridian@example.com',
         'from_name'  => 'Meridian',
     ],
+    'reset' => [
+        // Factory reset key. The owner generates a long, high-entropy key once,
+        // keeps the plaintext offline, and stores only its SHA-256 hash here.
+        // The plaintext is never held by the system. Generate a key and its
+        // hash with:
+        //   php -r "$k=bin2hex(random_bytes(32)); echo \"key: $k\nhash: \".hash('sha256',$k).\"\n\";"
+        // Leave empty to disable the reset area entirely.
+        'key_hash'       => '',
+        // Require a second administrator to approve before a reset can execute.
+        'two_person'     => false,
+    ],
     'uploads' => [
         // Absolute path is resolved from this file's directory.
         'dir'            => __DIR__ . '/storage/uploads',

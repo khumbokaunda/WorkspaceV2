@@ -15,8 +15,12 @@ declare(strict_types=1);
 function grp_permission_sections(): array
 {
     $labels = module_section_labels();
+    $restricted = restricted_permissions();
     $sections = [];
     foreach (db_all('SELECT id, permission_key, description FROM permissions ORDER BY permission_key') as $p) {
+        if (in_array($p['permission_key'], $restricted, true)) {
+            continue; // restricted permissions are never delegated through the editor
+        }
         $prefix = explode('.', $p['permission_key'], 2)[0];
         $label = $labels[$prefix] ?? ucfirst(str_replace('_', ' ', $prefix));
         $sections[$label][] = $p;
@@ -187,12 +191,30 @@ function save_group(): void
     $wanted = array_map('intval', is_array($in['permission_ids'] ?? null) ? $in['permission_ids'] : []);
     $valid = array_map(fn($p) => (int)$p['id'], db_all('SELECT id FROM permissions'));
     $wanted = array_values(array_intersect($wanted, $valid));
-    // The Administrators group must always keep system administration, so it can
-    // never be stripped of the access that protects it.
+    // Restricted permissions never appear in the editor, so preserve any the
+    // group already held rather than silently stripping them on save.
+    $restrictedIds = array_map(
+        fn($p) => (int)$p['id'],
+        db_all(
+            'SELECT gp.permission_id AS id FROM group_permissions gp
+             JOIN permissions p ON p.id = gp.permission_id
+             WHERE gp.group_id = ? AND p.permission_key IN (' . implode(',', array_fill(0, count(restricted_permissions()), '?')) . ')',
+            array_merge([$gid], restricted_permissions())
+        )
+    );
+    foreach ($restrictedIds as $rid) {
+        if (!in_array($rid, $wanted, true)) {
+            $wanted[] = $rid;
+        }
+    }
+    // The Administrators group always keeps the system identity permissions, so
+    // it can never be stripped of the access that protects it.
     if (($existing['group_key'] ?? '') === 'administrators') {
-        $adminPermId = (int)db_val("SELECT id FROM permissions WHERE permission_key = 'system.admin'");
-        if ($adminPermId && !in_array($adminPermId, $wanted, true)) {
-            $wanted[] = $adminPermId;
+        foreach (restricted_permissions() as $key) {
+            $pid = (int)db_val('SELECT id FROM permissions WHERE permission_key = ?', [$key]);
+            if ($pid && !in_array($pid, $wanted, true)) {
+                $wanted[] = $pid;
+            }
         }
     }
     db_query('DELETE FROM group_permissions WHERE group_id = ?', [$gid]);
