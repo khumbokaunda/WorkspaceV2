@@ -51,6 +51,11 @@ function index(): void
     }
     $user = current_user();
     $state = reset_wiz();
+    $approval = reset_pending_approval();
+    $approvalRequester = null;
+    if ($approval) {
+        $approvalRequester = (string)db_val('SELECT username FROM users WHERE id = ?', [(int)$approval['requested_by']]);
+    }
     render('admin/reset', [
         'pageTitle' => 'Factory Reset',
         'breadcrumbs' => ['Admin' => null, 'Factory Reset' => null],
@@ -59,7 +64,9 @@ function index(): void
         'confirmPhrase' => reset_confirm_phrase(),
         'hasTotp' => ($user['totp_secret'] ?? '') !== '',
         'twoPerson' => reset_two_person_required(),
-        'pendingApproval' => reset_pending_approval(),
+        'pendingApproval' => $approval,
+        'approvalRequester' => $approvalRequester,
+        'currentUserId' => (int)$user['id'],
     ]);
 }
 
@@ -271,10 +278,20 @@ function execute(): void
     );
     $logId = db_insert_id();
 
-    // 2. Capture what is needed to recreate the administrator.
+    // 2. Capture what is needed to recreate the administrator, and the current
+    // administrator addresses to notify (before the users table is wiped).
     $username = (string)$user['username'];
     $email = (string)($user['email'] ?? '');
     $keepHash = (string)$user['password_hash'];
+    $adminEmails = array_map(
+        fn($r) => (string)$r['email'],
+        db_all(
+            "SELECT DISTINCT u.email FROM users u
+             JOIN user_groups ug ON ug.user_id = u.id
+             JOIN `groups` g ON g.id = ug.group_id
+             WHERE g.group_key = 'administrators' AND u.email <> ''"
+        )
+    );
 
     try {
         // 4. Wipe.
@@ -296,8 +313,8 @@ function execute(): void
         json_err('The reset failed partway through. Your archive is safe and can be restored. Reference is in the reset log.', 500);
     }
 
-    // Notify administrators by email, if mail is configured (best effort).
-    reset_email_admins($username, $state['reason']);
+    // Notify the original administrators by email, if mail is configured.
+    reset_email_admins($username, $state['reason'], $adminEmails);
 
     // 8. Destroy the session and log out.
     reset_cleanup_tmp(0, null);
@@ -324,23 +341,21 @@ function reset_resolve_admin_password(array $state, string $keepHash): array
     }
 }
 
-// Email every administrator address that a reset occurred (best effort).
-function reset_email_admins(string $actor, array $reason): void
+// Email the given administrator addresses that a reset occurred (best effort).
+// The addresses are captured before the wipe so the original administrators are
+// reached, not just the recreated one.
+function reset_email_admins(string $actor, array $reason, array $emails): void
 {
     try {
-        $admins = db_all(
-            "SELECT DISTINCT u.email FROM users u
-             JOIN user_groups ug ON ug.user_id = u.id
-             JOIN `groups` g ON g.id = ug.group_id
-             WHERE g.group_key = 'administrators' AND u.email <> ''"
-        );
         $when = date('j M Y H:i');
         $body = '<p>A factory reset was performed on this instance.</p>'
             . '<p><strong>By:</strong> ' . e($actor) . '<br>'
             . '<strong>When:</strong> ' . e($when) . '<br>'
             . '<strong>Reason:</strong> ' . e($reason['category'] ?? '') . ' - ' . e($reason['text'] ?? '') . '</p>';
-        foreach ($admins as $a) {
-            send_mail((string)$a['email'], 'Administrator', 'A factory reset was performed', $body);
+        foreach (array_unique($emails) as $addr) {
+            if ($addr !== '') {
+                send_mail((string)$addr, 'Administrator', 'A factory reset was performed', $body);
+            }
         }
     } catch (Throwable $ex) {
         error_log('Reset admin email failed: ' . $ex->getMessage());

@@ -12,6 +12,21 @@ $a = $state['archive'] ?? null;
     </div>
 </div>
 
+<?php if ($twoPerson && $pendingApproval && $pendingApproval['status'] === 'pending' && (int)$pendingApproval['requested_by'] !== (int)$currentUserId): ?>
+<div class="mx-card mb-3" style="border-left:3px solid var(--mx-warning)">
+    <div class="mx-card-body d-flex align-items-start justify-content-between gap-3 flex-wrap">
+        <div>
+            <h2 style="font-size:15px" class="mb-1"><i class="fa-solid fa-user-shield me-1"></i>A reset is awaiting your approval</h2>
+            <p class="text-muted mb-0" style="font-size:13px"><strong><?= e($approvalRequester ?? 'An administrator') ?></strong> has requested a factory reset: <?= e($pendingApproval['reason_category']) ?> - <?= e($pendingApproval['reason_text']) ?></p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" onclick="RW.approveRequest(<?= (int)$pendingApproval['id'] ?>)">Approve</button>
+            <button class="btn btn-subtle btn-sm" onclick="RW.declineRequest(<?= (int)$pendingApproval['id'] ?>)">Decline</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="mx-card mb-3" style="border-left:3px solid var(--mx-danger)">
     <div class="mx-card-body d-flex align-items-start gap-3">
         <i class="fa-solid fa-triangle-exclamation" style="font-size:22px;color:var(--mx-danger)"></i>
@@ -282,6 +297,17 @@ var RW = {
         if (!RW.approval || !RW.approval.id) { location.reload(); return; }
         MX.api('POST', '/admin/reset/cancel-approval/' + RW.approval.id, {})
             .then(function () { RW.approval = null; RW.renderApproval(); }).catch(RW.fail);
+    },
+    approveRequest: function (id) {
+        MX.confirm('Approve this factory reset?', 'The requesting administrator will be able to run it.', 'Approve').then(function (go) {
+            if (!go) return;
+            MX.api('POST', '/admin/reset/approve/' + id, {})
+                .then(function () { MX.ok('Approved.'); setTimeout(function () { location.reload(); }, 500); }).catch(RW.fail);
+        });
+    },
+    declineRequest: function (id) {
+        MX.api('POST', '/admin/reset/cancel-approval/' + id, {})
+            .then(function () { MX.ok('Declined.'); setTimeout(function () { location.reload(); }, 500); }).catch(RW.fail);
     }
 };
 
