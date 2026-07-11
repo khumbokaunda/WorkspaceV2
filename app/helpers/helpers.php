@@ -397,6 +397,36 @@ function user_can(string $permissionKey, ?array $user = null): bool
     return isset($perms[$permissionKey]);
 }
 
+// The Administrators group id, the standing that must never reach zero active
+// members. The last administrator is protected wherever membership or account
+// status changes.
+function admin_group_id(): int
+{
+    return (int)db_val("SELECT id FROM `groups` WHERE group_key = 'administrators'");
+}
+
+// How many active accounts belong to the Administrators group, optionally
+// ignoring one account (the one being edited).
+function active_admin_count(?int $exceptUserId = null): int
+{
+    $gid = admin_group_id();
+    if (!$gid) {
+        return 0;
+    }
+    if ($exceptUserId !== null) {
+        return (int)db_val(
+            'SELECT COUNT(*) FROM user_groups ug JOIN users u ON u.id = ug.user_id
+             WHERE ug.group_id = ? AND u.is_active = 1 AND u.id <> ?',
+            [$gid, $exceptUserId]
+        );
+    }
+    return (int)db_val(
+        'SELECT COUNT(*) FROM user_groups ug JOIN users u ON u.id = ug.user_id
+         WHERE ug.group_id = ? AND u.is_active = 1',
+        [$gid]
+    );
+}
+
 // The group ids a user belongs to, primary department first.
 function user_group_ids(?array $user = null): array
 {

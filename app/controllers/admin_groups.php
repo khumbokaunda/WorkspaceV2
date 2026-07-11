@@ -74,6 +74,12 @@ function grp_render_list(string $type, string $view, string $pageTitle): void
         'navModules' => array_filter(module_catalog(), fn($m) => !empty($m['nav'])),
         'people' => db_all("SELECT id, first_name, last_name FROM people WHERE employment_status = 'Active' ORDER BY first_name, last_name"),
         'departments' => db_all("SELECT id, name FROM `groups` WHERE type = 'department' AND is_active = 1 ORDER BY name"),
+        'accounts' => db_all(
+            "SELECT u.id, u.username, u.is_active,
+                    TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS name
+             FROM users u LEFT JOIN people p ON p.id = u.person_id
+             ORDER BY u.username"
+        ),
     ]);
 }
 
@@ -253,6 +259,54 @@ function delete_group(string $id): void
     db_query('DELETE FROM `groups` WHERE id = ?', [$gid]);
     audit('group.delete', 'group', $gid, ['name' => $group['name'], 'type' => $group['type']]);
     json_ok(['archived' => false]);
+}
+
+// Add an account to an access group. Membership is managed here only for access
+// groups; a department is a person's single primary home, set on the account
+// itself so it is never left blank.
+function add_member(string $id): void
+{
+    $gid = (int)$id;
+    $group = db_row("SELECT * FROM `groups` WHERE id = ?", [$gid]);
+    if (!$group) {
+        json_err('That group does not exist.', 404);
+    }
+    if ($group['type'] !== 'access_group') {
+        json_err('Department membership is set on the account, in its primary department.', 422);
+    }
+    $userId = in_int('user_id');
+    if (!$userId || !db_val('SELECT id FROM users WHERE id = ?', [$userId])) {
+        json_err('Choose a valid account.', 422, ['user_id' => 'Invalid account.']);
+    }
+    db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,0)', [$userId, $gid]);
+    audit('group.member_add', 'group', $gid, ['user_id' => $userId, 'group' => $group['name']]);
+    json_ok();
+}
+
+// Remove an account from an access group, protecting the last administrator.
+function remove_member(string $id): void
+{
+    $gid = (int)$id;
+    $group = db_row("SELECT * FROM `groups` WHERE id = ?", [$gid]);
+    if (!$group) {
+        json_err('That group does not exist.', 404);
+    }
+    if ($group['type'] !== 'access_group') {
+        json_err('A person always keeps a primary department. Move them to another department on their account instead.', 422);
+    }
+    $userId = in_int('user_id');
+    if (!$userId) {
+        json_err('Choose a valid account.', 422, ['user_id' => 'Invalid account.']);
+    }
+    if ($group['group_key'] === 'administrators') {
+        $active = (bool)db_val('SELECT is_active FROM users WHERE id = ?', [$userId]);
+        if ($active && active_admin_count($userId) === 0) {
+            json_err('This is the last active administrator. Grant Administrators to another active account first.', 422, ['user_id' => 'Last administrator.']);
+        }
+    }
+    db_query('DELETE FROM user_groups WHERE user_id = ? AND group_id = ? AND is_primary = 0', [$userId, $gid]);
+    audit('group.member_remove', 'group', $gid, ['user_id' => $userId, 'group' => $group['name']]);
+    json_ok();
 }
 
 // Reactivate an archived group.

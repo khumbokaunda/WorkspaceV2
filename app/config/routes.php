@@ -328,6 +328,8 @@ return [
     ['POST',   '/admin/groups',               'admin_groups@save_group',    ['auth', 'csrf', 'rbac:admin.roles']],
     ['DELETE', '/admin/groups/{id}',          'admin_groups@delete_group',  ['auth', 'csrf', 'rbac:admin.roles']],
     ['POST',   '/admin/groups/{id}/restore',  'admin_groups@restore_group', ['auth', 'csrf', 'rbac:admin.roles']],
+    ['POST',   '/admin/groups/{id}/members',  'admin_groups@add_member',    ['auth', 'csrf', 'rbac:admin.roles']],
+    ['DELETE', '/admin/groups/{id}/members',  'admin_groups@remove_member', ['auth', 'csrf', 'rbac:admin.roles']],
     ['GET',    '/admin/roles',                'admin_roles@index',          ['auth', 'rbac:admin.roles', 'module:admin_roles']],
     ['POST',   '/admin/roles/permissions',    'admin_roles@save_permissions', ['auth', 'csrf', 'rbac:admin.roles']],
     ['POST',   '/admin/roles/visibility',     'admin_roles@save_visibility',  ['auth', 'csrf', 'rbac:admin.roles']],
