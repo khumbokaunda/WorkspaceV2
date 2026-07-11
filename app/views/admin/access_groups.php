@@ -61,11 +61,11 @@
 <script>
 var mxGroupType = 'access_group';
 var mxGroupTypeLabel = 'access group';
-var mxPermSections = <?= json_encode(array_map(fn($rows) => array_map(fn($p) => ['id' => (int)$p['id'], 'key' => $p['permission_key'], 'description' => $p['description']], $rows), $permissionSections), JSON_UNESCAPED_SLASHES) ?>;
-var mxNavModules = <?= json_encode(array_map(fn($m) => $m['label'], $navModules), JSON_UNESCAPED_SLASHES) ?>;
-var mxPeople = <?= json_encode(array_map(fn($p) => ['id' => (int)$p['id'], 'name' => trim($p['first_name'] . ' ' . $p['last_name'])], $people), JSON_UNESCAPED_SLASHES) ?>;
+var mxPermSections = <?= json_encode(array_map(fn($rows) => array_map(fn($p) => ['id' => (int)$p['id'], 'key' => $p['permission_key'], 'description' => $p['description']], $rows), $permissionSections)) ?>;
+var mxNavModules = <?= json_encode(array_map(fn($m) => $m['label'], $navModules)) ?>;
+var mxPeople = <?= json_encode(array_map(fn($p) => ['id' => (int)$p['id'], 'name' => trim($p['first_name'] . ' ' . $p['last_name'])], $people)) ?>;
 var mxDepartments = [];
-var mxAccounts = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['id'], 'username' => $a['username'], 'name' => $a['name'], 'is_active' => (int)$a['is_active']], $accounts), JSON_UNESCAPED_SLASHES) ?>;
+var mxAccounts = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['id'], 'username' => $a['username'], 'name' => $a['name'], 'is_active' => (int)$a['is_active']], $accounts)) ?>;
 var mxCurrentGroupId = null;
 var mxCurrentMembers = [];
 
@@ -234,3 +234,4 @@ function mxRestoreGroup(id) {
         .then(function () { MX.ok('Restored.'); setTimeout(function () { location.reload(); }, 400); })
         .catch(function (e) { MX.fail(e.message); });
 }
+</script>
