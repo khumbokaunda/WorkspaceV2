@@ -30,6 +30,7 @@ function setup_optional_modules(): array
         'helpdesk'       => 'A lightweight ticket system for staff to report IT or facilities issues.',
         'fleet'          => 'Vehicles with assignment and service, insurance and license expiry alerts.',
         'bookings'       => 'A shared calendar for meeting rooms and equipment, with double-booking prevention.',
+        'appraisals'     => 'Performance review cycles with goals and ratings per employee.',
     ];
 }
 

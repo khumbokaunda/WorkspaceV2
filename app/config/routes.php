@@ -273,6 +273,17 @@ return [
     ['POST',   '/noticeboard/policies/{id}/link', 'noticeboard@policy_link',       ['auth', 'csrf', 'rbac:noticeboard.view']],
     ['GET',    '/noticeboard/policies/file/{token}', 'noticeboard@download_policy', ['auth', 'rbac:noticeboard.view']],
 
+    // Performance and appraisals
+    ['GET',    '/appraisals',                     'appraisals@index',             ['auth', 'rbac:appraisals.view_own', 'module:appraisals']],
+    ['GET',    '/appraisals/{id}',                'appraisals@show',              ['auth', 'rbac:appraisals.view_own', 'module:appraisals']],
+    ['POST',   '/appraisals/cycles',              'appraisals@save_cycle',        ['auth', 'csrf', 'rbac:appraisals.manage']],
+    ['POST',   '/appraisals',                     'appraisals@create_appraisal',  ['auth', 'csrf', 'rbac:appraisals.manage']],
+    ['PATCH',  '/appraisals/{id}',                'appraisals@update_appraisal',  ['auth', 'csrf', 'rbac:appraisals.manage']],
+    ['POST',   '/appraisals/{id}/submit',         'appraisals@submit_appraisal',  ['auth', 'csrf', 'rbac:appraisals.manage']],
+    ['POST',   '/appraisals/{id}/acknowledge',    'appraisals@acknowledge_appraisal', ['auth', 'csrf', 'rbac:appraisals.view_own']],
+    ['POST',   '/appraisals/{id}/goals',          'appraisals@add_goal',          ['auth', 'csrf', 'rbac:appraisals.manage']],
+    ['DELETE', '/appraisals/goals/{id}',          'appraisals@delete_goal',       ['auth', 'csrf', 'rbac:appraisals.manage']],
+
     // Meeting room and resource booking
     ['GET',    '/bookings',                       'bookings@index',               ['auth', 'rbac:bookings.book', 'module:bookings']],
     ['GET',    '/api/bookings',                   'bookings@list_json',           ['auth', 'rbac:bookings.book']],
