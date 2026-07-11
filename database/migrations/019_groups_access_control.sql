@@ -129,6 +129,16 @@ SELECT DISTINCT LOWER(REPLACE(REPLACE(REPLACE(TRIM(department), ' ', '_'), '.', 
 FROM people
 WHERE department IS NOT NULL AND TRIM(department) <> '';
 
+-- A set of sensible default departments so a fresh install has somewhere to
+-- place people from the start. On an existing install any key already derived
+-- from real data is kept by the INSERT IGNORE, so nothing is duplicated.
+INSERT IGNORE INTO `groups` (group_key, name, type, is_system, sort_order) VALUES
+    ('management', 'Management', 'department', 0, 11),
+    ('sales',      'Sales',      'department', 0, 12),
+    ('it',         'IT',         'department', 0, 13),
+    ('hr',         'HR',         'department', 0, 14),
+    ('finance',    'Finance',    'department', 0, 15);
+
 -- Each department is seeded with the baseline (staff) role permissions, so a
 -- member who only belongs to a department keeps staff-level access.
 INSERT IGNORE INTO group_permissions (group_id, permission_id)

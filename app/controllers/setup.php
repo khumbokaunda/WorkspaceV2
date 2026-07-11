@@ -191,6 +191,28 @@ function submit(): void
         $adminId = db_insert_id();
     }
 
+    // Access comes from groups. Make the first administrator a member of the
+    // protected Administrators access group and give them a primary department,
+    // so a fresh install has a working administrator from the start. Guarded so
+    // the wizard also runs on an install where the groups migration ran and
+    // already placed the seeded admin.
+    if (db_val("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'groups'")) {
+        $adminGroupId = (int)db_val("SELECT id FROM `groups` WHERE group_key = 'administrators'");
+        if ($adminGroupId) {
+            db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,0)', [$adminId, $adminGroupId]);
+        }
+        // A primary department, preferring Management, then General.
+        if (!db_val('SELECT 1 FROM user_groups WHERE user_id = ? AND is_primary = 1', [$adminId])) {
+            $deptId = (int)db_val(
+                "SELECT id FROM `groups` WHERE type = 'department' AND is_active = 1
+                 ORDER BY group_key = 'management' DESC, group_key = 'general' DESC, sort_order LIMIT 1"
+            );
+            if ($deptId) {
+                db_query('INSERT IGNORE INTO user_groups (user_id, group_id, is_primary) VALUES (?,?,1)', [$adminId, $deptId]);
+            }
+        }
+    }
+
     // Module enablement: core stays on, optional set to the selection.
     foreach ($valid as $key) {
         db_query(
