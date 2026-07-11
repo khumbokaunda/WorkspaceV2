@@ -6,7 +6,10 @@ $a = $state['archive'] ?? null;
 ?>
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <h1 style="font-size:20px" class="mb-0">Factory Reset</h1>
-    <a class="btn btn-outline-primary btn-sm" href="/admin/reset/history"><i class="fa-solid fa-clock-rotate-left me-1"></i>Reset history</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="/admin/restore"><i class="fa-solid fa-upload me-1"></i>Restore from archive</a>
+        <a class="btn btn-outline-primary btn-sm" href="/admin/reset/history"><i class="fa-solid fa-clock-rotate-left me-1"></i>Reset history</a>
+    </div>
 </div>
 
 <div class="mx-card mb-3" style="border-left:3px solid var(--mx-danger)">

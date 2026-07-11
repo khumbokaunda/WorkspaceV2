@@ -5,3 +5,4 @@ storage/uploads/*
 storage/logs/*
 !storage/logs/.gitkeep
 .DS_Store
+storage/reset_tmp/

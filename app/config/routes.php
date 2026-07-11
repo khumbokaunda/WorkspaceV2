@@ -349,6 +349,8 @@ return [
     ['POST',   '/admin/reset/request-approval',   'reset@request_approval', ['auth', 'csrf', 'rbac:system.reset']],
     ['POST',   '/admin/reset/approve/{id}',       'reset@approve',          ['auth', 'csrf', 'rbac:system.reset']],
     ['POST',   '/admin/reset/cancel-approval/{id}','reset@cancel_approval', ['auth', 'csrf', 'rbac:system.reset']],
+    ['GET',    '/admin/restore',              'restore@index',              ['auth', 'rbac:system.reset', 'module:admin_reset']],
+    ['POST',   '/admin/restore/execute',      'restore@execute',            ['auth', 'csrf', 'rbac:system.reset']],
     ['GET',    '/admin/audit',                'admin_audit@index',          ['auth', 'rbac:admin.audit', 'module:admin_audit']],
     ['GET',    '/api/admin/audit',            'admin_audit@list_json',      ['auth', 'rbac:admin.audit']],
     ['GET',    '/admin/settings',             'admin_settings@index',       ['auth', 'rbac:admin.settings', 'module:admin_settings']],

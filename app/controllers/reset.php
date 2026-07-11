@@ -41,13 +41,6 @@ function reset_wiz_clear(): void
     unset($_SESSION['reset_wiz']);
 }
 
-// The typed confirmation phrase: the company name if set, otherwise RESET.
-function reset_confirm_phrase(): string
-{
-    $name = trim((string)setting('org_name', ''));
-    return $name !== '' ? $name : 'RESET';
-}
-
 function index(): void
 {
     if (!reset_key_configured()) {
@@ -112,45 +105,6 @@ function step_reason(): void
     $state['step'] = max($state['step'], 3);
     reset_wiz_save($state);
     json_ok(['step' => 3]);
-}
-
-// The three-factor check, throttled through login_attempts. Returns true on
-// success; on failure records an attempt and leaves a generic message in $err.
-function reset_check_factors(string $password, string $totp, string $key, string &$err): bool
-{
-    $user = current_user();
-    $username = (string)$user['username'];
-    $ip = request_ip();
-
-    $wait = throttle_wait_seconds($username, $ip);
-    if ($wait > 0) {
-        $err = 'Too many attempts. Please wait ' . $wait . ' seconds and try again.';
-        return false;
-    }
-
-    $ok = true;
-    if (($user['totp_secret'] ?? '') === '') {
-        $err = 'Enrol in two-factor authentication before performing a reset.';
-        return false;
-    }
-    if (!password_verify($password, (string)$user['password_hash'])) {
-        $ok = false;
-    }
-    if (!totp_verify_code((string)$user['totp_secret'], preg_replace('/\D/', '', $totp))) {
-        $ok = false;
-    }
-    if (!reset_verify_key($key)) {
-        $ok = false;
-    }
-
-    db_query(
-        'INSERT INTO login_attempts (username, ip_address, successful) VALUES (?,?,?)',
-        [$username, $ip, $ok ? 1 : 0]
-    );
-    if (!$ok) {
-        $err = 'One or more factors did not match. This attempt has been recorded.';
-    }
-    return $ok;
 }
 
 // Step 3: authenticate with all three factors.

@@ -424,3 +424,50 @@ function reset_factory_password(): string
 {
     return 'ChangeMe!12345';
 }
+
+// The typed confirmation phrase: the company name if set, otherwise RESET.
+// Shared by the reset and restore wizards.
+function reset_confirm_phrase(): string
+{
+    $name = trim((string)setting('org_name', ''));
+    return $name !== '' ? $name : 'RESET';
+}
+
+// The three-factor check shared by reset and restore: the account password, a
+// current authenticator code, and the reset key, verified together and
+// throttled through login_attempts. Returns true on success; on failure records
+// an attempt and leaves a generic message in $err. Requires the auth and
+// throttle helpers, which the calling controllers load.
+function reset_check_factors(string $password, string $totp, string $key, string &$err): bool
+{
+    $user = current_user();
+    $username = (string)$user['username'];
+    $ip = request_ip();
+
+    $wait = throttle_wait_seconds($username, $ip);
+    if ($wait > 0) {
+        $err = 'Too many attempts. Please wait ' . $wait . ' seconds and try again.';
+        return false;
+    }
+    if (($user['totp_secret'] ?? '') === '') {
+        $err = 'Enrol in two-factor authentication before performing this action.';
+        return false;
+    }
+
+    $ok = true;
+    if (!password_verify($password, (string)$user['password_hash'])) {
+        $ok = false;
+    }
+    if (!totp_verify_code((string)$user['totp_secret'], preg_replace('/\D/', '', $totp))) {
+        $ok = false;
+    }
+    if (!reset_verify_key($key)) {
+        $ok = false;
+    }
+
+    db_query('INSERT INTO login_attempts (username, ip_address, successful) VALUES (?,?,?)', [$username, $ip, $ok ? 1 : 0]);
+    if (!$ok) {
+        $err = 'One or more factors did not match. This attempt has been recorded.';
+    }
+    return $ok;
+}
