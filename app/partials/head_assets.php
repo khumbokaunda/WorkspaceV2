@@ -21,6 +21,21 @@
 })();
 </script>
 <link rel="preload" href="/assets/vendor/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<?php
+// Favicon: the set generated from the icon mark when present, otherwise the
+// generated initials placeholder so the browser tab is always branded and never
+// requests a missing file.
+$fav32 = brand_favicon('32');
+$fav16 = brand_favicon('16');
+$fav180 = brand_favicon('180');
+?>
+<?php if ($fav32): ?>
+<link rel="icon" type="image/png" sizes="32x32" href="<?= e($fav32) ?>">
+<?php if ($fav16): ?><link rel="icon" type="image/png" sizes="16x16" href="<?= e($fav16) ?>"><?php endif; ?>
+<?php if ($fav180): ?><link rel="apple-touch-icon" sizes="180x180" href="<?= e($fav180) ?>"><?php endif; ?>
+<?php else: ?>
+<link rel="icon" href="<?= e(brand_placeholder_uri()) ?>">
+<?php endif; ?>
 <link href="/assets/vendor/css/fonts.css" rel="stylesheet">
 <link href="/assets/vendor/css/bootstrap.min.css" rel="stylesheet">
 <link href="/assets/vendor/css/fontawesome.min.css" rel="stylesheet">
