@@ -101,18 +101,23 @@ function execute(): void
     }
     $zip->close();
 
+    // Verify that files the database references actually exist on disk, and
+    // record any that are missing rather than failing silently.
+    $missing = restore_verify_files();
+    $notes = $missing ? ('Missing after restore: ' . implode('; ', array_slice($missing, 0, 50))) : null;
+
     // Log success into the freshly restored reset_log, so the restore is
     // recorded even though the replay rewrote the table.
     db_query(
         'INSERT INTO reset_log
             (initiated_user_id, initiated_username, initiated_email, reason_category, reason_text,
-             archive_filename, archive_checksum, app_version, ip_address, scope, success)
-         VALUES (?,?,?,?,?,?,?,?,?,?,1)',
+             archive_filename, archive_checksum, app_version, ip_address, scope, success, notes)
+         VALUES (?,?,?,?,?,?,?,?,?,?,1,?)',
         [
             (int)$user['id'], (string)$user['username'], (string)($user['email'] ?? null),
             'Restore', 'Restored from archive ' . ($_FILES['archive']['name'] ?? ''),
             (string)($_FILES['archive']['name'] ?? ''), hash('sha256', $sql),
-            app_version(), request_ip(), 'restore',
+            app_version(), request_ip(), 'restore', $notes,
         ]
     );
 
@@ -122,7 +127,10 @@ function execute(): void
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_destroy();
     }
-    json_ok(['redirect' => '/login?restored=1']);
+    json_ok([
+        'redirect' => '/login?restored=1',
+        'missing_files' => $missing,
+    ]);
 }
 
 // Replay a SQL dump. The dump carries its own foreign-key toggles and uses
@@ -146,26 +154,41 @@ function restore_replay_sql(string $sql): void
     $db->query('SET FOREIGN_KEY_CHECKS = 1');
 }
 
-// Restore uploaded files from the archive: clear the current uploads, then
-// extract every uploads/ entry back to its relative path.
+// Restore files from the archive: clear every registered backup root, then
+// extract each files/<root>/<relative path> entry back to its root. A legacy
+// archive that used the old uploads/ prefix is still handled.
 function restore_files(ZipArchive $zip): void
 {
-    reset_delete_uploads();
-    $base = rtrim((string)config('uploads.dir', APP_ROOT . '/storage/uploads'), '/');
-    if (!is_dir($base)) {
-        mkdir($base, 0750, true);
+    reset_delete_backup_files();
+    $roots = backup_roots();
+    foreach ($roots as $base) {
+        if (!is_dir($base)) {
+            mkdir($base, 0750, true);
+        }
     }
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
-        if ($name === false || strpos($name, 'uploads/') !== 0 || substr($name, -1) === '/') {
+        if ($name === false || substr($name, -1) === '/') {
             continue;
         }
-        $rel = substr($name, strlen('uploads/'));
-        // Guard against path traversal in archive entries.
-        if ($rel === '' || strpos($rel, '..') !== false) {
+        // Determine the destination root and relative path.
+        $rootKey = null;
+        $rel = null;
+        if (strpos($name, 'files/') === 0) {
+            $rest = substr($name, strlen('files/'));
+            $slash = strpos($rest, '/');
+            if ($slash !== false) {
+                $rootKey = substr($rest, 0, $slash);
+                $rel = substr($rest, $slash + 1);
+            }
+        } elseif (strpos($name, 'uploads/') === 0) {
+            $rootKey = 'uploads';
+            $rel = substr($name, strlen('uploads/'));
+        }
+        if ($rootKey === null || $rel === null || $rel === '' || !isset($roots[$rootKey]) || strpos($rel, '..') !== false) {
             continue;
         }
-        $dest = $base . '/' . $rel;
+        $dest = rtrim($roots[$rootKey], '/') . '/' . $rel;
         $destDir = dirname($dest);
         if (!is_dir($destDir)) {
             mkdir($destDir, 0750, true);
@@ -181,4 +204,29 @@ function restore_files(ZipArchive $zip): void
         }
         fclose($stream);
     }
+}
+
+// After a restore, verify that files the database references actually exist on
+// disk: every branding path on the company profile and every document
+// stored_name. Returns a list of human-readable descriptions of what is
+// missing, so the administrator is told rather than discovering it later.
+function restore_verify_files(): array
+{
+    $missing = [];
+    $brandingBase = storage_path('branding');
+    $profile = db_row('SELECT * FROM company_profile WHERE id = 1') ?: [];
+    foreach (['logo_light', 'logo_dark', 'icon_light', 'icon_dark', 'favicon_32', 'favicon_180', 'favicon_16'] as $col) {
+        $name = trim((string)($profile[$col] ?? ''));
+        if ($name !== '' && !is_file($brandingBase . '/' . basename($name))) {
+            $missing[] = 'branding ' . $col . ' (' . $name . ')';
+        }
+    }
+    $uploadsBase = rtrim((string)config('uploads.dir', storage_path('uploads')), '/');
+    foreach (db_all('SELECT stored_name FROM documents') as $doc) {
+        $name = trim((string)$doc['stored_name']);
+        if ($name !== '' && !is_file($uploadsBase . '/' . basename($name))) {
+            $missing[] = 'document file ' . $name;
+        }
+    }
+    return $missing;
 }

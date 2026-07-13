@@ -99,10 +99,10 @@ function reset_company_slug(): string
     return $slug !== '' ? $slug : 'meridian';
 }
 
-// Every file under storage/uploads, as paths relative to that directory.
-function reset_upload_files(): array
+// Every file under a directory, as paths relative to that directory.
+function reset_root_files(string $base): array
 {
-    $base = rtrim((string)config('uploads.dir', APP_ROOT . '/storage/uploads'), '/');
+    $base = rtrim($base, '/');
     if (!is_dir($base)) {
         return [];
     }
@@ -195,8 +195,17 @@ function reset_build_archive(string $scope = 'full'): array
     $counts = reset_dump_sql($sqlPath, $tables);
     $sqlChecksum = hash_file('sha256', $sqlPath);
 
-    $uploadsBase = rtrim((string)config('uploads.dir', APP_ROOT . '/storage/uploads'), '/');
-    $files = reset_upload_files();
+    // Gather every file from every registered backup root. Files are stored in
+    // the archive under files/<root>/<relative path> so the restore knows which
+    // location each belongs to, and the manifest records each root's file count
+    // so a restore can verify what it unpacks.
+    $rootFiles = [];
+    $rootMeta = [];
+    foreach (backup_roots() as $key => $absDir) {
+        $files = reset_root_files($absDir);
+        $rootFiles[$key] = ['base' => rtrim($absDir, '/'), 'files' => $files];
+        $rootMeta[$key] = ['file_count' => count($files)];
+    }
 
     $manifest = [
         'app_version'     => app_version(),
@@ -207,7 +216,7 @@ function reset_build_archive(string $scope = 'full'): array
         'sql_filename'    => 'database.sql',
         'sql_checksum'    => $sqlChecksum,
         'row_counts'      => $counts,
-        'files'           => $files,
+        'backup_roots'    => $rootMeta,
     ];
 
     $zip = new ZipArchive();
@@ -217,10 +226,12 @@ function reset_build_archive(string $scope = 'full'): array
     }
     $zip->addFile($sqlPath, 'database.sql');
     $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    foreach ($files as $rel) {
-        $abs = $uploadsBase . '/' . $rel;
-        if (is_file($abs)) {
-            $zip->addFile($abs, 'uploads/' . $rel);
+    foreach ($rootFiles as $key => $info) {
+        foreach ($info['files'] as $rel) {
+            $abs = $info['base'] . '/' . $rel;
+            if (is_file($abs)) {
+                $zip->addFile($abs, 'files/' . $key . '/' . $rel);
+            }
         }
     }
     if ($zip->close() !== true) {
@@ -284,28 +295,38 @@ function reset_wipe(string $scope = 'full'): void
     $db->query('SET FOREIGN_KEY_CHECKS = 1');
 
     if ($scope !== 'scoped') {
-        reset_delete_uploads();
+        reset_delete_backup_files();
     }
 }
 
-// Delete every file under storage/uploads, keeping the directory itself.
-function reset_delete_uploads(): void
+// Delete every file under every registered backup root, keeping the
+// directories themselves. Iterates the registry so a new file location is
+// cleared automatically once it is registered.
+function reset_delete_backup_files(): void
 {
-    $base = rtrim((string)config('uploads.dir', APP_ROOT . '/storage/uploads'), '/');
-    if (!is_dir($base)) {
-        return;
-    }
-    $it = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
-    );
-    foreach ($it as $item) {
-        if ($item->isFile() || $item->isLink()) {
-            @unlink($item->getPathname());
-        } elseif ($item->isDir()) {
-            @rmdir($item->getPathname());
+    foreach (backup_roots() as $base) {
+        $base = rtrim($base, '/');
+        if (!is_dir($base)) {
+            continue;
+        }
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $item) {
+            if ($item->isFile() || $item->isLink()) {
+                @unlink($item->getPathname());
+            } elseif ($item->isDir()) {
+                @rmdir($item->getPathname());
+            }
         }
     }
+}
+
+// Backwards-compatible alias kept for the restore controller.
+function reset_delete_uploads(): void
+{
+    reset_delete_backup_files();
 }
 
 // Re-seed the fresh default state: module enablement, base settings, the seed
