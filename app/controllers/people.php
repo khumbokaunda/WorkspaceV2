@@ -22,6 +22,10 @@ function index(): void
         'pageTitle' => 'Directory',
         'breadcrumbs' => ['People' => null, 'Directory' => null],
         'departments' => db_all("SELECT DISTINCT department FROM people WHERE department IS NOT NULL AND department <> '' ORDER BY department"),
+        // The canonical departments (the department groups), for the onboarding
+        // department picker so a person is placed in a real department rather
+        // than a free-typed string.
+        'departmentGroups' => db_all("SELECT name FROM `groups` WHERE type = 'department' AND is_active = 1 ORDER BY sort_order, name"),
         'managers' => db_all("SELECT id, first_name, last_name FROM people WHERE employment_status = 'Active' ORDER BY first_name"),
         'accountDepartments' => user_can('admin.users') ? db_all("SELECT id, name FROM `groups` WHERE type = 'department' AND is_active = 1 ORDER BY name") : [],
         'accountAccessGroups' => user_can('admin.users') ? db_all("SELECT id, name FROM `groups` WHERE type = 'access_group' AND is_active = 1 ORDER BY sort_order, name") : [],

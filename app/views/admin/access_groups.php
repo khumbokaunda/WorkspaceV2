@@ -66,6 +66,7 @@ var mxNavModules = <?= json_encode(array_map(fn($m) => $m['label'], $navModules)
 var mxPeople = <?= json_encode(array_map(fn($p) => ['id' => (int)$p['id'], 'name' => trim($p['first_name'] . ' ' . $p['last_name'])], $people)) ?>;
 var mxDepartments = [];
 var mxAccounts = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['id'], 'username' => $a['username'], 'name' => $a['name'], 'is_active' => (int)$a['is_active']], $accounts)) ?>;
+var mxCloneSources = <?= json_encode(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name'], 'type' => $g['type']], $cloneSources)) ?>;
 var mxCurrentGroupId = null;
 var mxCurrentMembers = [];
 
@@ -114,10 +115,23 @@ function mxGroupForm(g, permIds, moduleVis) {
             '<div id="mx-member-list"></div>';
     }
 
+    var cloneHtml = '';
+    if (!g.id && mxCloneSources.length) {
+        cloneHtml = '<div class="mb-3 p-2" style="background:var(--mx-bg);border:1px solid var(--mx-border);border-radius:8px">' +
+            '<label class="form-label" style="font-size:12px">Start from an existing group <span class="text-muted" style="font-weight:400">(optional)</span></label>' +
+            '<select class="form-select form-select-sm" onchange="mxCloneFrom(this.value)">' +
+            '<option value="">Blank</option>' +
+            mxCloneSources.map(function (s) { return '<option value="' + s.id + '">' + MX.escape(s.name) + ' (' + (s.type === 'department' ? 'department' : 'access group') + ')</option>'; }).join('') +
+            '</select>' +
+            '<div class="text-muted" style="font-size:11px;margin-top:4px">Copies that group\'s permissions and module visibility as a starting point. You can then add or remove anything before saving.</div>' +
+            '</div>';
+    }
+
     return '<form id="group-form">' +
         '<input type="hidden" name="id" value="' + (g.id || 0) + '">' +
         '<input type="hidden" name="type" value="' + mxGroupType + '">' +
         (isSystem ? '<div class="alert alert-info py-2" style="font-size:12px"><i class="fa-solid fa-shield-halved me-1"></i>This is a protected system group. It cannot be deleted, keeps system administration, and its last active member cannot be removed.</div>' : '') +
+        cloneHtml +
         '<div class="mb-3"><label class="form-label">Name</label><input class="form-control" name="name" required maxlength="128" value="' + MX.escape(g.name || '') + '"></div>' +
         '<div class="mb-3"><label class="form-label">Description</label><input class="form-control" name="description" maxlength="255" value="' + MX.escape(g.description || '') + '"></div>' +
         '<div class="mb-3"><label class="form-label">Owner</label><select class="form-select" name="head_person_id">' + headOpts + '</select></div>' +
@@ -135,6 +149,28 @@ function mxGroupForm(g, permIds, moduleVis) {
 
 function mxPermAll(on) {
     document.querySelectorAll('.mx-gperm').forEach(function (b) { b.checked = on; });
+}
+
+// Copy an existing group's permissions and module visibility into the open new
+// group form as a starting point. The group can then be edited freely.
+function mxCloneFrom(id) {
+    if (!id) return;
+    fetch('/api/admin/groups/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) { MX.fail(data.error || 'Could not load that group.'); return; }
+            var permIds = data.permission_ids || [];
+            document.querySelectorAll('.mx-gperm').forEach(function (box) {
+                box.checked = permIds.indexOf(parseInt(box.value, 10)) !== -1;
+            });
+            var vis = data.module_visibility || {};
+            document.querySelectorAll('.mx-gvis').forEach(function (sel) {
+                var key = sel.dataset.key;
+                sel.value = vis.hasOwnProperty(key) ? (vis[key] ? 'show' : 'hide') : 'default';
+            });
+            MX.ok('Copied from ' + MX.escape(data.group.name) + '. Adjust as needed before saving.');
+        })
+        .catch(function () { MX.fail('Could not load that group.'); });
 }
 
 function mxRenderMembers() {

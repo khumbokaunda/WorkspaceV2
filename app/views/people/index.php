@@ -46,6 +46,7 @@
 
 <script>
 var mxCanCreateAccount = <?= user_can('admin.users') ? 'true' : 'false' ?>;
+var mxDepartmentGroups = <?= json_encode(array_map(fn($d) => $d['name'], $departmentGroups)) ?>;
 var mxAccountDepartments = <?= json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name']], $accountDepartments)) ?>;
 var mxAccountAccessGroups = <?= json_encode(array_map(fn($g) => ['id' => (int)$g['id'], 'name' => $g['name']], $accountAccessGroups)) ?>;
 var mxStarterAssets = <?= json_encode(array_map(fn($a) => ['id' => (int)$a['id'], 'label' => $a['asset_tag'] . ' ' . $a['name']], $starterAssets)) ?>;
@@ -128,7 +129,10 @@ function mxOpenOnboarding() {
         '<div class="mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" maxlength="40"></div>' +
         '<hr><h3 style="font-size:14px" class="mb-3">Role and department</h3>' +
         '<div class="mb-3"><label class="form-label">Job title</label><input class="form-control" name="job_title" maxlength="120"></div>' +
-        '<div class="mb-3"><label class="form-label">Department</label><input class="form-control" name="department" maxlength="120"></div>' +
+        '<div class="mb-3"><label class="form-label">Department</label><select class="form-select" name="department">' +
+        '<option value="">Choose a department</option>' +
+        mxDepartmentGroups.map(function (d) { return '<option value="' + MX.escape(d) + '">' + MX.escape(d) + '</option>'; }).join('') +
+        '</select></div>' +
         '<div class="mb-3"><label class="form-label">Manager</label><select class="form-select" name="manager_id"><option value="">None</option>' +
         mxManagers.map(function (m) { return '<option value="' + m.id + '">' + MX.escape(m.name) + '</option>'; }).join('') +
         '</select></div>' +

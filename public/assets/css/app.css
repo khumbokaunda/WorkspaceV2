@@ -388,6 +388,23 @@ html.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
 .parsley-errors-list { list-style: none; padding: 0; margin: 4px 0 0; color: var(--mx-danger); font-size: 12px; }
 .parsley-error { border-color: var(--mx-danger) !important; }
 
+/* Server field errors float just under their input, out of the normal flow, so
+   they never push the surrounding fields around. A subtle background keeps them
+   legible if they land over adjacent help text. */
+.mx-server-error {
+    position: absolute;
+    z-index: 5;
+    color: var(--mx-danger);
+    font-size: 12px;
+    line-height: 1.3;
+    margin-top: 2px;
+    max-width: 100%;
+    background: var(--mx-surface);
+    padding: 1px 4px;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
 /* -------------------------------------------------------------- drawer -- */
 
 .mx-drawer-backdrop {

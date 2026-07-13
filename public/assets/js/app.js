@@ -114,17 +114,33 @@
         }).then(function (r) { return r.isConfirmed; });
     };
 
-    // Show Parsley-style field errors returned by the server on a form.
+    // Show field errors returned by the server on a form. The message is
+    // positioned absolutely just under its input so it never pushes the
+    // surrounding fields down; it clears on the next submit or when the field
+    // is edited.
     MX.showFieldErrors = function (root, fields) {
         root.querySelectorAll('.mx-server-error').forEach(function (el) { el.remove(); });
+        root.querySelectorAll('.parsley-error').forEach(function (el) { el.classList.remove('parsley-error'); });
         Object.keys(fields || {}).forEach(function (name) {
             const input = root.querySelector('[name="' + name + '"]');
             if (!input) return;
-            const msg = document.createElement('div');
-            msg.className = 'mx-server-error parsley-errors-list';
-            msg.textContent = fields[name];
             input.classList.add('parsley-error');
-            input.insertAdjacentElement('afterend', msg);
+            const parent = input.parentElement;
+            if (!parent) return;
+            if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+            const msg = document.createElement('div');
+            msg.className = 'mx-server-error';
+            msg.textContent = fields[name];
+            // Anchor the message to the input's box, in the gap below it, out of
+            // the normal flow so it moves nothing.
+            msg.style.top = (input.offsetTop + input.offsetHeight) + 'px';
+            msg.style.left = input.offsetLeft + 'px';
+            parent.appendChild(msg);
+            input.addEventListener('input', function clear() {
+                msg.remove();
+                input.classList.remove('parsley-error');
+                input.removeEventListener('input', clear);
+            });
         });
     };
 

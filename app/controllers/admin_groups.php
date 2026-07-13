@@ -21,6 +21,13 @@ function grp_permission_sections(): array
         if (in_array($p['permission_key'], $restricted, true)) {
             continue; // restricted permissions are never delegated through the editor
         }
+        // Hide permissions whose optional module is not enabled on this
+        // instance, so the editor only ever offers access that actually exists.
+        // Core permissions (no owning optional module) are always shown.
+        $module = module_for_permission($p['permission_key']);
+        if ($module !== null && !module_enabled($module)) {
+            continue;
+        }
         $prefix = explode('.', $p['permission_key'], 2)[0];
         $label = $labels[$prefix] ?? ucfirst(str_replace('_', ' ', $prefix));
         $sections[$label][] = $p;
@@ -75,9 +82,18 @@ function grp_render_list(string $type, string $view, string $pageTitle): void
         'type' => $type,
         'groups' => $groups,
         'permissionSections' => grp_permission_sections(),
-        'navModules' => array_filter(module_catalog(), fn($m) => !empty($m['nav'])),
+        // Only enabled navigation modules can be forced visible or hidden, since
+        // a disabled module does not exist for anyone.
+        'navModules' => array_filter(
+            module_catalog(),
+            fn($m, $k) => !empty($m['nav']) && module_enabled($k),
+            ARRAY_FILTER_USE_BOTH
+        ),
         'people' => db_all("SELECT id, first_name, last_name FROM people WHERE employment_status = 'Active' ORDER BY first_name, last_name"),
         'departments' => db_all("SELECT id, name FROM `groups` WHERE type = 'department' AND is_active = 1 ORDER BY name"),
+        'cloneSources' => db_all(
+            "SELECT id, name, type FROM `groups` WHERE is_active = 1 ORDER BY type, sort_order, name"
+        ),
         'accounts' => db_all(
             "SELECT u.id, u.username, u.is_active,
                     TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))) AS name
