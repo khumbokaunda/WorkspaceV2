@@ -149,16 +149,18 @@ function submit(): void
     // compliance library and tender modules read a populated profile from the
     // start. Guarded because the profile table arrives with a later migration
     // and an install may not have applied it yet.
+    $displayName = mb_substr(trim((string)($_POST['display_name'] ?? '')), 0, 64) ?: null;
     if (db_val("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'company_profile'")) {
         db_query(
-            'INSERT INTO company_profile (id, legal_name, trading_name, reg_number, tax_id, phys_address, postal_address, phone, email, logo_path)
-             VALUES (1,?,?,?,?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE legal_name = VALUES(legal_name), trading_name = VALUES(trading_name),
+            'INSERT INTO company_profile (id, legal_name, display_name, trading_name, reg_number, tax_id, phys_address, postal_address, phone, email, logo_path)
+             VALUES (1,?,?,?,?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE legal_name = VALUES(legal_name), display_name = VALUES(display_name),
+                 trading_name = VALUES(trading_name),
                  reg_number = VALUES(reg_number), tax_id = VALUES(tax_id), phys_address = VALUES(phys_address),
                  postal_address = VALUES(postal_address), phone = VALUES(phone), email = VALUES(email),
                  logo_path = COALESCE(VALUES(logo_path), logo_path)',
             [
-                $legalName, $tradingName,
+                $legalName, $displayName, $tradingName,
                 trim((string)($_POST['reg_number'] ?? '')) ?: null,
                 trim((string)($_POST['tax_id'] ?? '')) ?: null,
                 trim((string)($_POST['phys_address'] ?? '')) ?: null,

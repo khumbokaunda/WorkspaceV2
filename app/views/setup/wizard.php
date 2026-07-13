@@ -37,7 +37,10 @@
         <form id="mx-setup-form" onsubmit="return false">
             <!-- Step 1: Company -->
             <div class="mx-setup-panel" data-panel="1">
-                <div class="mb-3"><label class="form-label">Legal name</label><input class="form-control" name="legal_name" required></div>
+                <div class="mb-3"><label class="form-label">Legal name</label><input class="form-control" name="legal_name" required>
+                    <div class="text-muted" style="font-size:12px">The full registered name, used on documents.</div></div>
+                <div class="mb-3"><label class="form-label">Display name</label><input class="form-control" name="display_name" maxlength="64" placeholder="A short label, for example Phantom Stack">
+                    <div class="text-muted" style="font-size:12px">The short label shown in the sidebar and browser tab. Leave empty to use the legal name.</div></div>
                 <div class="mb-3"><label class="form-label">Trading name</label><input class="form-control" name="trading_name" placeholder="Defaults to the legal name"></div>
                 <div class="row g-2 mb-3">
                     <div class="col"><label class="form-label">Registration number</label><input class="form-control" name="reg_number"></div>

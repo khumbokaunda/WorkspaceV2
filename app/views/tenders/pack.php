@@ -42,8 +42,13 @@ $num = fn($v) => rtrim(rtrim(number_format((float)$v, 2), '0'), '.');
 </div>
 
 <div class="cover">
-<?php if (!empty($profile['logo_path'])): ?>
-    <img class="logo" src="<?= e($profile['logo_path']) ?>" alt="Company logo">
+<?php
+// Documents use the branding light logo when set, then the legacy logo path.
+// The legal name, never the display name, identifies the entity on documents.
+$docLogo = brand_slot_filled('logo_light') ? brand_asset('full', 'light') : (!empty($profile['logo_path']) ? $profile['logo_path'] : null);
+?>
+<?php if ($docLogo): ?>
+    <img class="logo" src="<?= e($docLogo) ?>" alt="Company logo">
 <?php endif; ?>
     <h1><?= e($profile['trading_name'] ?? ($profile['legal_name'] ?? 'Company')) ?></h1>
     <div class="muted">
