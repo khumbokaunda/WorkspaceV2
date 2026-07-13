@@ -40,35 +40,62 @@ function brand_store_image(array $file): string
     if ($mime !== $allowed[$ext]) {
         throw new RuntimeException('The image content does not match its extension.');
     }
-    if (!extension_loaded('gd')) {
-        throw new RuntimeException('Image processing is unavailable on this server.');
-    }
-    $img = brand_gd_load((string)$file['tmp_name'], $mime);
-    if ($img === null) {
+    // Dimension check does not need an image library: getimagesize is core PHP
+    // and guards against a decompression attack whether or not GD is present.
+    $size = @getimagesize((string)$file['tmp_name']);
+    if ($size === false) {
         throw new RuntimeException('That image could not be read.');
     }
-    $w = imagesx($img);
-    $h = imagesy($img);
+    [$w, $h] = $size;
     if ($w < 1 || $h < 1 || $w > BRAND_MAX_SIDE || $h > BRAND_MAX_SIDE) {
-        imagedestroy($img);
         throw new RuntimeException('The image dimensions are out of range. Keep each side under ' . BRAND_MAX_SIDE . ' pixels.');
     }
 
     $dir = storage_path('branding');
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
-        imagedestroy($img);
         throw new RuntimeException('Could not prepare the branding directory.');
     }
-    // Re-encode to PNG so the stored bytes are a freshly written image with no
-    // metadata or appended payload, and transparency is preserved.
-    $stored = bin2hex(random_bytes(16)) . '.png';
-    imagealphablending($img, false);
-    imagesavealpha($img, true);
-    if (!imagepng($img, $dir . '/' . $stored)) {
-        imagedestroy($img);
+
+    // Re-encode through GD, then Imagick, where either is available: re-encoding
+    // strips metadata and any appended payload and normalises the file to PNG.
+    if (extension_loaded('gd')) {
+        $img = brand_gd_load((string)$file['tmp_name'], $mime);
+        if ($img !== null) {
+            $stored = bin2hex(random_bytes(16)) . '.png';
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+            $ok = imagepng($img, $dir . '/' . $stored);
+            imagedestroy($img);
+            if (!$ok) {
+                throw new RuntimeException('Could not store the image.');
+            }
+            return $stored;
+        }
+    }
+    if (extension_loaded('imagick')) {
+        try {
+            $im = new Imagick((string)$file['tmp_name']);
+            $im->setImageFormat('png');
+            $im->stripImage();
+            $stored = bin2hex(random_bytes(16)) . '.png';
+            $im->writeImage($dir . '/' . $stored);
+            $im->clear();
+            return $stored;
+        } catch (Throwable $ex) {
+            error_log('Branding: Imagick re-encode failed, storing the validated upload directly: ' . $ex->getMessage());
+        }
+    }
+
+    // No image library available. The upload has passed extension, MIME,
+    // dimension and size checks and is a raster (never SVG), so store the
+    // validated bytes directly under a random name and note the missing
+    // re-encode in the log rather than failing the upload.
+    error_log('Branding: no image library available, storing the validated upload without re-encoding.');
+    $stored = bin2hex(random_bytes(16)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+    $dest = $dir . '/' . $stored;
+    if (!(is_uploaded_file((string)$file['tmp_name']) ? move_uploaded_file((string)$file['tmp_name'], $dest) : copy((string)$file['tmp_name'], $dest))) {
         throw new RuntimeException('Could not store the image.');
     }
-    imagedestroy($img);
     return $stored;
 }
 
@@ -94,14 +121,18 @@ function brand_gd_load(string $path, string $mime)
 function brand_generate_favicons(string $iconStored): array
 {
     $src = storage_path('branding') . '/' . $iconStored;
+    $fallback = ['favicon_32' => $iconStored, 'favicon_180' => $iconStored, 'favicon_16' => $iconStored];
     if (!extension_loaded('gd') || !is_file($src)) {
         error_log('Branding: GD unavailable or icon missing, favicon falls back to the icon mark at native size.');
-        return ['favicon_32' => $iconStored, 'favicon_180' => $iconStored, 'favicon_16' => $iconStored];
+        return $fallback;
     }
-    $img = @imagecreatefrompng($src);
-    if ($img === false) {
+    // Load by the icon's actual type, since a server without a re-encoder may
+    // have stored a JPG or WEBP icon rather than a PNG.
+    $info = @getimagesize($src);
+    $img = $info ? brand_gd_load($src, (string)($info['mime'] ?? '')) : null;
+    if ($img === null) {
         error_log('Branding: could not read the icon mark for favicon generation, falling back to it directly.');
-        return ['favicon_32' => $iconStored, 'favicon_180' => $iconStored, 'favicon_16' => $iconStored];
+        return $fallback;
     }
     $sw = imagesx($img);
     $sh = imagesy($img);
