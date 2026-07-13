@@ -75,7 +75,10 @@
             <div class="mx-card-header"><h2>Logo</h2></div>
             <div class="mx-card-body">
 <?php if (!empty($profile['logo_path'])): ?>
-                <img src="<?= e($profile['logo_path']) ?>" alt="Company logo" style="max-width:100%;max-height:120px" class="mb-3 d-block">
+                <!-- Reserve the box height so the logo loading does not shift the card. -->
+                <div class="mb-3" style="height:120px;display:flex;align-items:center">
+                    <img src="<?= e($profile['logo_path']) ?>" alt="Company logo" height="120" style="max-width:100%;max-height:120px;width:auto">
+                </div>
 <?php else: ?>
                 <p class="text-muted" style="font-size:13px">No logo uploaded yet.</p>
 <?php endif; ?>

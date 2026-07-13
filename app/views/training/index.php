@@ -18,7 +18,7 @@
         </select>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-training-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-training-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><?php if ($canManage): ?><th>Person</th><?php endif; ?><th>Course</th><th>Provider</th><th>Toward</th><th>Target</th><th>Status</th><th></th></tr></thead>
             <tbody></tbody>
         </table>

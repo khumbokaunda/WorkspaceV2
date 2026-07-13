@@ -30,7 +30,7 @@ $taskProjects = $taskProjects ?? [];
     <div class="mx-card-body">
         <div id="task-board" class="mx-board" aria-label="Task board"></div>
         <div id="task-list" style="display:none">
-            <table id="task-table" class="table mx-stack align-middle" style="width:100%">
+            <table id="task-table" class="table dt-host mx-stack align-middle" style="width:100%">
                 <thead><tr><th>Title</th><th>Project</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Due</th></tr></thead>
                 <tbody></tbody>
             </table>

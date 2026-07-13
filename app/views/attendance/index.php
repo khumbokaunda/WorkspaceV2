@@ -68,7 +68,7 @@
                 <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxSheetTable, 'timesheet')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
             </div>
             <div class="mx-card-body mx-flush">
-                <table id="mx-sheet" class="table mx-stack align-middle" style="width:100%">
+                <table id="mx-sheet" class="table dt-host mx-stack align-middle" style="width:100%">
                     <thead><tr><th>Date</th><th>Person</th><th>In</th><th>Out</th><th>Mode</th><th>State</th><?= $canCorrect ? '<th></th>' : '' ?></tr></thead>
                     <tbody></tbody>
                 </table>

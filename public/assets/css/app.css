@@ -47,6 +47,20 @@
     --mx-sidebar-w-collapsed: 68px;
     --mx-topbar-h: 60px;
     --mx-drawer-w: 480px;
+
+    /* Motion. Durations are short, because interface motion should feel
+       instant. Every transition and animation reads its timing from these,
+       never a hardcoded value. */
+    --motion-instant: 80ms;   /* button press, hover */
+    --motion-fast:   140ms;   /* fades, small reveals, exits */
+    --motion-base:   200ms;   /* drawers, modals, most transitions */
+    --motion-slow:   280ms;   /* larger surfaces only, use sparingly */
+
+    /* Easing. Never linear for interface motion. Entering elements decelerate
+       and settle; leaving elements accelerate out of the way. */
+    --ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+    --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+    --ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
 }
 
 [data-bs-theme="dark"] {
@@ -73,6 +87,29 @@
     --mx-shadow-rest:    0 1px 2px rgba(0, 0, 0, 0.4);
     --mx-shadow-raised:  0 4px 12px rgba(0, 0, 0, 0.5);
     --mx-shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* -------------------------------------------------------------- motion -- */
+
+/* Suppress every transition and animation until the first frame has painted,
+   so no element can animate its way into its initial state (the sidebar width,
+   the theme, any persisted state). Removed on window load. */
+html.preload *,
+html.preload *::before,
+html.preload *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Reduced motion is an accessibility requirement: motion is never needed to
+   understand the interface, it simply appears instantly. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 /* ---------------------------------------------------------------- base -- */
@@ -122,7 +159,7 @@ code, .mx-mono {
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    transition: width 0.15s ease, min-width 0.15s ease;
+    transition: width var(--motion-fast) var(--ease-standard), min-width var(--motion-fast) var(--ease-standard);
     z-index: 1030;
 }
 .mx-sidebar .mx-brand {
@@ -164,12 +201,15 @@ code, .mx-mono {
 }
 .mx-nav-link.active i { color: var(--mx-primary); }
 
-body.mx-sidebar-collapsed .mx-sidebar { width: var(--mx-sidebar-w-collapsed); min-width: var(--mx-sidebar-w-collapsed); }
-body.mx-sidebar-collapsed .mx-sidebar .mx-nav-label,
-body.mx-sidebar-collapsed .mx-sidebar .mx-nav-section,
-body.mx-sidebar-collapsed .mx-sidebar .mx-brand-name { display: none; }
-body.mx-sidebar-collapsed .mx-nav-link { justify-content: center; }
-body.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
+/* Collapsed state is driven by a root class set before first paint (see the
+   head script), so the correct width is applied by CSS on the very first frame
+   with no JavaScript after load. */
+html.mx-sidebar-collapsed .mx-sidebar { width: var(--mx-sidebar-w-collapsed); min-width: var(--mx-sidebar-w-collapsed); }
+html.mx-sidebar-collapsed .mx-sidebar .mx-nav-label,
+html.mx-sidebar-collapsed .mx-sidebar .mx-nav-section,
+html.mx-sidebar-collapsed .mx-sidebar .mx-brand-name { display: none; }
+html.mx-sidebar-collapsed .mx-nav-link { justify-content: center; }
+html.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
 
 .mx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
@@ -242,6 +282,10 @@ body.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
 
 .mx-stat {
     display: flex; flex-direction: column; gap: 2px;
+    /* Reserve height so the number appearing after a query does not resize the
+       card and shift everything below it. */
+    min-height: 54px;
+    justify-content: center;
 }
 .mx-stat .mx-stat-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .mx-stat .mx-stat-label { font-size: 12px; color: var(--mx-muted); font-weight: 500; }
@@ -322,7 +366,7 @@ body.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
     background: rgba(15, 23, 42, 0.45);
     z-index: 1040;
     opacity: 0;
-    transition: opacity 0.18s ease;
+    transition: opacity var(--motion-fast) var(--ease-standard);
 }
 .mx-drawer-backdrop.show { opacity: 1; }
 
@@ -334,9 +378,14 @@ body.mx-sidebar-collapsed .mx-nav-link i { width: auto; }
     z-index: 1045;
     display: flex; flex-direction: column;
     transform: translateX(100%);
-    transition: transform 0.2s ease;
+    /* Enters decelerating over the base duration; the close override below
+       accelerates it out faster. */
+    transition: transform var(--motion-base) var(--ease-decelerate);
+    will-change: transform;
 }
 .mx-drawer.show { transform: translateX(0); }
+/* Leaving is quicker than arriving, and accelerates out of the way. */
+.mx-drawer:not(.show) { transition: transform var(--motion-fast) var(--ease-accelerate); }
 .mx-drawer-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 20px;
@@ -461,6 +510,60 @@ div.dt-container .dt-paging .dt-paging-button.current:hover {
     100% { background-position: -200% 0; }
 }
 
+/* ---------------------------------------------------- render and motion -- */
+
+/* DataTables managed tables. The raw, unpaginated table must never paint and
+   then be rebuilt, so it is hidden from the first frame (opacity, no
+   transition) and revealed only once DataTables signals initComplete. A floor
+   height keeps the region from collapsing while it initialises. */
+.dt-host { opacity: 0; }
+.dt-host.dt-ready { opacity: 1; transition: opacity var(--motion-fast) var(--ease-standard); }
+div.dt-container { min-height: 120px; }
+
+/* The main content area makes a single, subtle entrance. The class is added
+   once, after the first paint, so the animation plays exactly once and never
+   replays when the preload suppression is lifted. With no scripting the content
+   simply shows at rest. */
+.mx-content.mx-enter {
+    animation: mx-content-in var(--motion-base) var(--ease-decelerate) both;
+}
+@keyframes mx-content-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Button and interactive feedback: a quick hover change and a subtle press
+   that snaps back, so every click feels acknowledged. Transform and colour
+   only, never layout. */
+.btn, .mx-icon-btn, .mx-search-btn, .mx-nav-link {
+    transition: background-color var(--motion-instant) var(--ease-standard),
+                border-color var(--motion-instant) var(--ease-standard),
+                color var(--motion-instant) var(--ease-standard),
+                box-shadow var(--motion-instant) var(--ease-standard),
+                transform var(--motion-instant) var(--ease-standard);
+}
+.btn:active, .mx-icon-btn:active, .mx-search-btn:active { transform: scale(0.98); }
+
+/* Modal: Bootstrap's fade plus a small scale reads better than a plain fade. */
+.modal.fade .modal-dialog {
+    transform: scale(0.98);
+    transition: transform var(--motion-fast) var(--ease-decelerate),
+                opacity var(--motion-fast) var(--ease-standard);
+}
+.modal.show .modal-dialog { transform: scale(1); }
+
+/* Status change highlight: a brief flash on a row whose status updated in
+   place, to draw the eye to what changed. Fades on its own. */
+@keyframes mx-row-flash {
+    from { background-color: var(--mx-primary-tint); }
+    to   { background-color: transparent; }
+}
+.mx-flash-row { animation: mx-row-flash 600ms var(--ease-standard); }
+
+/* Optional, capped row entrance for the first rows of a freshly drawn table.
+   Never re-runs on sort or pagination (JS applies it once). */
+tr.mx-row-in { animation: mx-content-in var(--motion-fast) var(--ease-decelerate) both; }
+
 /* ------------------------------------------------------------- kanban -- */
 
 .mx-board { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
@@ -545,7 +648,7 @@ div.dt-container .dt-paging .dt-paging-button.current:hover {
     .mx-sidebar {
         position: fixed; left: 0; top: 0;
         transform: translateX(-100%);
-        transition: transform 0.2s ease;
+        transition: transform var(--motion-base) var(--ease-standard);
         width: var(--mx-sidebar-w) !important;
         min-width: var(--mx-sidebar-w) !important;
     }

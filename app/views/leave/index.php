@@ -82,7 +82,7 @@
                 <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxLeaveTable, 'leave')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
             </div>
             <div class="mx-card-body mx-flush">
-                <table id="mx-leave-table" class="table mx-stack align-middle" style="width:100%">
+                <table id="mx-leave-table" class="table dt-host mx-stack align-middle" style="width:100%">
                     <thead><tr><th>Person</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Review</th><th></th></tr></thead>
                     <tbody></tbody>
                 </table>

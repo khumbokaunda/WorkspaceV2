@@ -23,7 +23,7 @@
     </div>
     <div class="mx-card-body mx-flush">
         <div class="table-responsive">
-            <table id="mx-audit-table" class="table mx-stack align-middle mb-0" style="width:100%">
+            <table id="mx-audit-table" class="table dt-host mx-stack align-middle mb-0" style="width:100%">
                 <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th><th>IP</th></tr></thead>
                 <tbody></tbody>
             </table>

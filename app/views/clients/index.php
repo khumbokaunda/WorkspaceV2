@@ -27,7 +27,7 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxClientTable, 'clients')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-client-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-client-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><th>Name</th><th>Type</th><th>Sector</th><th>Main contact</th><th>Opportunities</th></tr></thead>
             <tbody></tbody>
         </table>
@@ -56,7 +56,7 @@
         </select>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-opp-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-opp-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><th>Title</th><th>Client</th><th>Value</th><th>Stage</th><th>Decision</th><th>Owner</th><th></th></tr></thead>
             <tbody></tbody>
         </table>

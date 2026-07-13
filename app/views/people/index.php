@@ -28,7 +28,7 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxPeopleTable, 'people')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-people-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-people-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead>
                 <tr><th>Name</th><th>Job title</th><th>Department</th><th>Manager</th><th>Status</th><th>Started</th></tr>
             </thead>

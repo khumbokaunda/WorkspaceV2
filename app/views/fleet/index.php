@@ -17,7 +17,7 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxFleetTable, 'vehicles')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-fleet-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-fleet-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><th>Registration</th><th>Vehicle</th><th>Driver</th><th>Service</th><th>Insurance</th><th>License</th><th>Status</th><th></th></tr></thead>
             <tbody></tbody>
         </table>

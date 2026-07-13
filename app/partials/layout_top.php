@@ -8,7 +8,7 @@ $user = current_user();
 $flashMsg = flash();
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="en" class="preload">
 <head>
     <?php require APP_ROOT . '/app/partials/head_assets.php'; ?>
     <title><?= e(($pageTitle ?? 'Home') . ' | ' . $appName) ?></title>

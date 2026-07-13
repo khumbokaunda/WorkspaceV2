@@ -62,7 +62,7 @@ $fmt = fn($v) => $v === null || $v === '' ? 'Not set' : $currency . ' ' . number
 <?php if (!$people): ?>
         <div class="mx-empty py-4"><i class="fa-solid fa-users"></i><p class="mb-0">No active people.</p></div>
 <?php else: ?>
-        <table id="mx-payroll-people" class="table mx-stack align-middle" style="width:100%;font-size:13px">
+        <table id="mx-payroll-people" class="table dt-host mx-stack align-middle" style="width:100%;font-size:13px">
             <thead><tr><th>Name</th><th>Job title</th><th>Department</th><th class="text-end">Basic salary</th></tr></thead>
             <tbody>
 <?php foreach ($people as $p): ?>

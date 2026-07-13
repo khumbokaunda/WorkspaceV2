@@ -11,7 +11,7 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxUserTable, 'users')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-user-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-user-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><th>Username</th><th>Email</th><th>Person</th><th>Department</th><th>Two-factor</th><th>Last login</th><th>Status</th><th></th></tr></thead>
             <tbody>
 <?php foreach ($users as $u): ?>

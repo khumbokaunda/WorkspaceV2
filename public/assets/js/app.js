@@ -268,6 +268,12 @@
     // Standard DataTable init: our toolbar handles search, so the built-in
     // filter box is hidden and wired to our input.
     MX.table = function (selector, opts) {
+        const el = document.querySelector(selector);
+        // Hide the table from the first frame so the raw, unpaginated table
+        // never paints and then gets rebuilt. Revealed on initComplete below.
+        if (el) el.classList.add('dt-host');
+        opts = opts || {};
+        const userInit = opts.initComplete;
         const defaults = {
             paging: true,
             pageLength: 15,
@@ -282,15 +288,34 @@
                 infoEmpty: '',
                 paginate: { previous: '&lsaquo;', next: '&rsaquo;' }
             },
-            dom: 'rt<"d-flex justify-content-between align-items-center px-3 py-2"ip>'
+            dom: 'rt<"d-flex justify-content-between align-items-center px-3 py-2"ip>',
+            initComplete: function (settings, json) {
+                // Fade the finished table in once DataTables has built it.
+                const node = this.closest ? this : $(this).closest('table')[0];
+                (el || node).classList.add('dt-ready');
+                if (typeof userInit === 'function') userInit.call(this, settings, json);
+            }
         };
-        const dt = new DataTable(selector, Object.assign(defaults, opts || {}));
-        const card = document.querySelector(selector).closest('.mx-card');
+        const dt = new DataTable(selector, Object.assign(defaults, opts));
+        const card = el ? el.closest('.mx-card') : null;
         if (card) {
             const search = card.querySelector('.mx-table-search');
             if (search) search.addEventListener('input', function () { dt.search(this.value).draw(); });
         }
         return dt;
+    };
+
+    // Brief highlight on a row (or any element) whose status changed in place,
+    // to draw the eye to what changed. Uses the token-driven flash keyframe.
+    MX.flashRow = function (el) {
+        if (!el) return;
+        el.classList.remove('mx-flash-row');
+        void el.offsetWidth; // restart the animation if it is already applied
+        el.classList.add('mx-flash-row');
+        el.addEventListener('animationend', function handler() {
+            el.classList.remove('mx-flash-row');
+            el.removeEventListener('animationend', handler);
+        });
     };
 
     // CSV export of a DataTable's current (filtered) data.
@@ -375,6 +400,22 @@
         }
     };
 
+    // One frame after the DOM is ready (so the first frame has painted with
+    // transitions suppressed), release the suppression and trigger the content
+    // entrance. Doing both together means the entrance plays exactly once and no
+    // transition animates the initial state settling in. The content stays
+    // visible at rest until this runs, so a scripting failure never blanks it.
+    function mxRelease() {
+        document.documentElement.classList.remove('preload');
+        var content = document.querySelector('.mx-content');
+        if (content) content.classList.add('mx-enter');
+    }
+    if (document.readyState !== 'loading') {
+        requestAnimationFrame(mxRelease);
+    } else {
+        document.addEventListener('DOMContentLoaded', function () { requestAnimationFrame(mxRelease); });
+    }
+
     // ------------------------------------------------------------ boot --
     document.addEventListener('DOMContentLoaded', function () {
         // Theme icon reflects the theme applied before first paint.
@@ -384,20 +425,19 @@
             themeIcon.className = current === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
         }
 
-        // Sidebar toggles.
+        // Sidebar toggles. The collapsed state lives on the root element and is
+        // applied before paint by the head script, so here we only flip it and
+        // persist the value. Mobile uses the off-canvas open class on the body.
         const collapseBtn = document.getElementById('mx-sidebar-toggle');
         if (collapseBtn) {
             collapseBtn.addEventListener('click', function () {
                 if (window.innerWidth < 992) {
                     document.body.classList.toggle('mx-sidebar-open');
                 } else {
-                    document.body.classList.toggle('mx-sidebar-collapsed');
-                    localStorage.setItem('mx-sidebar', document.body.classList.contains('mx-sidebar-collapsed') ? '1' : '0');
+                    document.documentElement.classList.toggle('mx-sidebar-collapsed');
+                    localStorage.setItem('mx-sidebar', document.documentElement.classList.contains('mx-sidebar-collapsed') ? '1' : '0');
                 }
             });
-        }
-        if (localStorage.getItem('mx-sidebar') === '1' && window.innerWidth >= 992) {
-            document.body.classList.add('mx-sidebar-collapsed');
         }
         document.addEventListener('click', function (e) {
             if (window.innerWidth < 992 && document.body.classList.contains('mx-sidebar-open')) {

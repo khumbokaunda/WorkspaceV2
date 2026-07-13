@@ -30,7 +30,7 @@
         <button class="btn btn-subtle btn-sm" onclick="MX.exportCsv(window.mxTenderTable, 'tenders')"><i class="fa-solid fa-file-csv me-1"></i>CSV</button>
     </div>
     <div class="mx-card-body mx-flush">
-        <table id="mx-tender-table" class="table mx-stack align-middle" style="width:100%">
+        <table id="mx-tender-table" class="table dt-host mx-stack align-middle" style="width:100%">
             <thead><tr><th>Reference and title</th><th>Client</th><th>Closing</th><th>Value</th><th>Owner</th><th>Status</th></tr></thead>
             <tbody></tbody>
         </table>
