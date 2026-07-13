@@ -285,11 +285,148 @@ function setting(string $key, ?string $default = null): ?string
 // migration has run but the row is somehow absent, so callers never null out.
 function company_profile(): array
 {
-    static $row = null;
-    if ($row === null) {
-        $row = db_row('SELECT * FROM company_profile WHERE id = 1') ?? [];
+    if (!isset($GLOBALS['__company_profile']) || $GLOBALS['__company_profile'] === null) {
+        $GLOBALS['__company_profile'] = db_row('SELECT * FROM company_profile WHERE id = 1') ?? [];
     }
-    return $row;
+    return $GLOBALS['__company_profile'];
+}
+
+// Drop the cached company profile so the next read reflects a branding or
+// profile change made in the same request.
+function company_profile_refresh(): void
+{
+    $GLOBALS['__company_profile'] = null;
+}
+
+// ---------------------------------------------------------------------------
+// Storage roots and backup registry
+// ---------------------------------------------------------------------------
+
+// Absolute path under the storage directory.
+function storage_path(string $sub = ''): string
+{
+    return APP_ROOT . '/storage' . ($sub !== '' ? '/' . ltrim($sub, '/') : '');
+}
+
+// The single canonical list of directories holding persistent user or company
+// files. Anything added here is automatically backed up and restored. A module
+// that stores files MUST register its directory here, and nowhere else, so
+// backup coverage never drifts out of step with reality again.
+function backup_roots(): array
+{
+    return [
+        'uploads'  => storage_path('uploads'),   // gated documents, certificates, receipts
+        'branding' => storage_path('branding'),  // logos, icon marks, generated favicons
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Company branding
+// ---------------------------------------------------------------------------
+
+// The short label shown in the interface. Falls back to the legal name, then
+// the configured application name, so it is never empty.
+function brand_display_name(): string
+{
+    $p = company_profile();
+    $name = trim((string)($p['display_name'] ?? ''));
+    if ($name === '') {
+        $name = trim((string)($p['legal_name'] ?? ''));
+    }
+    if ($name === '') {
+        $name = (string)setting('org_name', config('app.name', 'Meridian'));
+    }
+    return $name;
+}
+
+// The full registered name, used on generated documents. Never rendered in the
+// sidebar.
+function brand_legal_name(): string
+{
+    $p = company_profile();
+    return trim((string)($p['legal_name'] ?? '')) ?: (string)setting('org_name', config('app.name', 'Meridian'));
+}
+
+// Up to two initials from the display name, for the generated placeholder.
+function brand_initials(): string
+{
+    $initials = '';
+    foreach (preg_split('/\s+/', trim(brand_display_name())) as $word) {
+        if ($word !== '') {
+            $initials .= mb_strtoupper(mb_substr($word, 0, 1));
+        }
+        if (mb_strlen($initials) >= 2) {
+            break;
+        }
+    }
+    return $initials !== '' ? $initials : 'M';
+}
+
+// The public URL for a stored branding file, cache-busted by the branding
+// version so a new upload is never masked by a cached copy.
+function brand_url(string $storedName): string
+{
+    $ver = (int)(company_profile()['branding_version'] ?? 0);
+    return '/branding/' . rawurlencode($storedName) . ($ver ? '?v=' . $ver : '');
+}
+
+// A generated placeholder: the display name initials in a rounded square using
+// the brand primary colour, as an inline SVG data URI so it needs no file and
+// makes no request. Legible on both light and dark surfaces.
+function brand_placeholder_uri(): string
+{
+    $initials = e(brand_initials());
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">'
+        . '<rect width="64" height="64" rx="14" fill="#4F46E5"/>'
+        . '<text x="32" y="34" font-family="Inter,Arial,sans-serif" font-size="26" font-weight="700"'
+        . ' fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">' . $initials . '</text></svg>';
+    return 'data:image/svg+xml;base64,' . base64_encode($svg);
+}
+
+// Resolve a branding asset to a usable URL, always. $slot is 'full' or 'icon',
+// $theme is 'light' or 'dark'. The fallback chain: the requested variant, then
+// the other theme variant, then (for an icon) the full logo scaled square by
+// the view, then the generated initials placeholder. No view ever reasons about
+// fallbacks; it just calls this and renders the result.
+function brand_asset(string $slot, string $theme = 'light'): string
+{
+    $p = company_profile();
+    $pick = function (array $cols) use ($p): ?string {
+        foreach ($cols as $c) {
+            if (!empty($p[$c])) {
+                return brand_url((string)$p[$c]);
+            }
+        }
+        return null;
+    };
+    if ($slot === 'icon') {
+        $url = $theme === 'dark'
+            ? $pick(['icon_dark', 'icon_light', 'logo_dark', 'logo_light'])
+            : $pick(['icon_light', 'icon_dark', 'logo_light', 'logo_dark']);
+    } else {
+        $url = $theme === 'dark'
+            ? $pick(['logo_dark', 'logo_light'])
+            : $pick(['logo_light', 'logo_dark']);
+    }
+    return $url ?? brand_placeholder_uri();
+}
+
+// Whether a branding slot resolves to a real uploaded file rather than the
+// placeholder, for the settings screen to show what is substituted.
+function brand_slot_filled(string $column): bool
+{
+    return !empty(company_profile()[$column] ?? null);
+}
+
+// A generated favicon URL for the given size, or null when none exists so the
+// head can fall back to the application default.
+function brand_favicon(string $size): ?string
+{
+    $col = ['32' => 'favicon_32', '180' => 'favicon_180', '16' => 'favicon_16'][$size] ?? null;
+    if ($col && !empty(company_profile()[$col] ?? null)) {
+        return brand_url((string)company_profile()[$col]);
+    }
+    return null;
 }
 
 // ---------------------------------------------------------------------------

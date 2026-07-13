@@ -1,6 +1,6 @@
-<?php $appName = setting('org_name', config('app.name', 'Meridian')); $flashMsg = flash(); ?>
+<?php $appName = brand_display_name(); $flashMsg = flash(); ?>
 <!doctype html>
-<html lang="en">
+<html lang="en" class="preload">
 <head>
     <?php require APP_ROOT . '/app/partials/head_assets.php'; ?>
     <title>Sign in | <?= e($appName) ?></title>
@@ -9,7 +9,10 @@
 <div class="mx-auth-page">
     <div class="mx-auth-card">
         <div class="d-flex align-items-center gap-2 mb-4">
-            <span class="mx-brand-mark" style="width:36px;height:36px;border-radius:9px;background:var(--mx-primary);color:#fff;display:inline-flex;align-items:center;justify-content:center"><i class="fa-solid fa-compass"></i></span>
+            <span class="mx-brand-logo-box">
+                <img class="brand-logo brand-logo-light" src="<?= e(brand_asset('full', 'light')) ?>" alt="<?= e($appName) ?>" width="40" height="40">
+                <img class="brand-logo brand-logo-dark" src="<?= e(brand_asset('full', 'dark')) ?>" alt="" width="40" height="40" aria-hidden="true">
+            </span>
             <h1 style="font-size:20px;margin:0"><?= e($appName) ?></h1>
         </div>
         <p class="text-muted mb-4">Sign in to your workspace.</p>

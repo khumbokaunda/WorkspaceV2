@@ -11,6 +11,9 @@ return [
     ['GET',    '/setup',                      'setup@index',                []],
     ['POST',   '/setup',                      'setup@submit',               ['csrf']],
 
+    // Public branding assets (served before authentication for the login page)
+    ['GET',    '/branding/{file}',            'brand@serve',                []],
+
     // Auth
     ['GET',    '/login',                      'auth@login_form',            []],
     ['POST',   '/login',                      'auth@login_submit',          ['throttle']],

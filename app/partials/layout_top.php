@@ -3,7 +3,7 @@
 // shared drawer and palette shells. Views render into .mx-content.
 // Expects: $pageTitle (string), optional $breadcrumbs (array of label => url,
 // null url renders plain text).
-$appName = setting('org_name', config('app.name', 'Meridian'));
+$appName = brand_display_name();
 $user = current_user();
 $flashMsg = flash();
 ?>

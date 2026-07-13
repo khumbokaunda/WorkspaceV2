@@ -34,6 +34,9 @@ function route_dispatch(): void
 
     foreach ($routes as [$routeMethod, $routePath, $handler, $middleware]) {
         $pattern = preg_replace('/\{token\}/', '([A-Za-z0-9_\-]+)', $routePath);
+        // {file} matches a stored filename (letters, digits, dot, dash,
+        // underscore, no slash so it cannot traverse out of its directory).
+        $pattern = preg_replace('/\{file\}/', '([A-Za-z0-9_.\-]+)', $pattern);
         $pattern = preg_replace('/\{[a-z]+\}/', '(\d+)', $pattern);
         $pattern = '#^' . $pattern . '$#';
 

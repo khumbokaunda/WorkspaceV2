@@ -10,10 +10,14 @@ foreach (visible_modules() as $key => $meta) {
     }
 }
 ?>
+<?php $brandName = brand_display_name(); ?>
 <aside class="mx-sidebar" aria-label="Primary navigation">
-    <a class="mx-brand" href="/dashboard">
-        <span class="mx-brand-mark"><i class="fa-solid fa-compass"></i></span>
-        <span class="mx-brand-name"><?= e($appName) ?></span>
+    <a class="mx-brand" href="/dashboard" title="<?= e($brandName) ?>">
+        <span class="mx-brand-mark">
+            <img class="brand-logo brand-logo-light" src="<?= e(brand_asset('icon', 'light')) ?>" alt="<?= e($brandName) ?>" width="32" height="32">
+            <img class="brand-logo brand-logo-dark" src="<?= e(brand_asset('icon', 'dark')) ?>" alt="" width="32" height="32" aria-hidden="true">
+        </span>
+        <span class="mx-brand-name"><?= e($brandName) ?></span>
     </a>
     <nav>
 <?php foreach ($navSections as $section => $items): ?>
