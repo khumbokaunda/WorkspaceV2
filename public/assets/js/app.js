@@ -322,40 +322,80 @@
     };
 
     // ----------------------------------------------------------- device --
-    // Lightweight, deliberately coarse device signals for the shared-device
-    // detection sidecar. Not an invasive fingerprint: enough to spot the same
-    // device, not to track a person across the internet. Collection is always
-    // optional and best-effort; if it fails the login or check-in proceeds.
+    // Device identity for the shared-device detection sidecar. Two independent
+    // tiers, never combined: a persistent server-issued token kept in
+    // localStorage (the hard identifier), and a set of high-stability signals
+    // the server folds into an inferred fingerprint hash (the soft fallback for
+    // when the token is absent). Deliberately NOT invasive: no canvas hashing,
+    // no audio-context probing, no font enumeration, no third-party library.
+    // Collection is always optional and best-effort; if it fails the login or
+    // check-in proceeds unchanged.
     MX.device = {
+        TOKEN_KEY: 'meridian_device_id',
+        // Client hints resolve asynchronously; we prime them once on boot and
+        // read whatever has resolved by the time a form is submitted.
+        _hints: '',
+
+        // The stored persistent token, or '' if none has been issued yet.
+        token: function () {
+            try { return localStorage.getItem(MX.device.TOKEN_KEY) || ''; } catch (e) { return ''; }
+        },
+        // Store a server-issued token. Idempotent; safe when storage is blocked
+        // (a private window simply keeps no token and leans on the hash).
+        adopt: function (t) {
+            try { if (/^[a-f0-9]{40}$/.test(t || '')) localStorage.setItem(MX.device.TOKEN_KEY, t); } catch (e) { /* no store, no token */ }
+        },
+
+        // The WebGL renderer and vendor: the single most distinguishing stable
+        // signal. Read once, then the context is discarded.
+        _gpu: function () {
+            try {
+                var c = document.createElement('canvas');
+                var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                if (!gl) return '';
+                var ext = gl.getExtension('WEBGL_debug_renderer_info');
+                if (!ext) return '';
+                var r = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
+                var v = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || '';
+                return (r + '~' + v).slice(0, 200);
+            } catch (e) { return ''; }
+        },
+
+        // Kick off the high-entropy client-hints request. Resolves quietly into
+        // the cache; never rejects in a way that matters to the caller.
+        prime: function () {
+            try {
+                var uad = navigator.userAgentData;
+                if (uad && typeof uad.getHighEntropyValues === 'function') {
+                    uad.getHighEntropyValues(['model', 'platformVersion', 'architecture', 'bitness', 'fullVersionList'])
+                        .then(function (h) {
+                            var fvl = (h.fullVersionList || []).map(function (b) { return b.brand + ':' + b.version; }).join(',');
+                            MX.device._hints = [h.model || '', h.platformVersion || '', h.architecture || '', h.bitness || '', fvl].join('|').slice(0, 300);
+                        }).catch(function () { /* keep the empty fallback */ });
+                }
+            } catch (e) { /* keep the empty fallback */ }
+        },
+
         collect: function () {
             var s = {};
             try {
-                s.dev_screen = (screen.width || 0) + 'x' + (screen.height || 0) + 'x' + (screen.colorDepth || 0);
-                s.dev_tz = String(new Date().getTimezoneOffset());
+                s.dev_token = MX.device.token();
+                s.dev_gpu = MX.device._gpu();
+                s.dev_hints = MX.device._hints;
+                s.dev_cores = String(navigator.hardwareConcurrency || '');
+                s.dev_memory = String(navigator.deviceMemory || '');
+                s.dev_touch = String(navigator.maxTouchPoints || 0);
+                var dpr = window.devicePixelRatio ? Math.round(window.devicePixelRatio * 100) / 100 : 1;
+                s.dev_screen = (screen.width || 0) + 'x' + (screen.height || 0) + 'x' + (screen.colorDepth || 0) + '@' + dpr;
+                // IANA zone name (stable across daylight-saving shifts, unlike a
+                // raw offset), falling back to the offset only where unavailable.
+                try { s.dev_tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').slice(0, 60); } catch (e) { s.dev_tz = ''; }
+                if (!s.dev_tz) s.dev_tz = String(new Date().getTimezoneOffset());
                 s.dev_platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '').slice(0, 80);
-                s.dev_canvas = MX.device._canvas();
             } catch (e) { /* leave whatever we managed to gather */ }
             return s;
         },
-        _canvas: function () {
-            try {
-                var c = document.createElement('canvas');
-                c.width = 200; c.height = 40;
-                var ctx = c.getContext('2d');
-                ctx.textBaseline = 'top';
-                ctx.font = '14px Arial';
-                ctx.fillStyle = '#069';
-                ctx.fillText('Meridian device', 2, 2);
-                ctx.strokeStyle = '#f60';
-                ctx.beginPath(); ctx.arc(50, 20, 15, 0, Math.PI * 2); ctx.stroke();
-                var data = c.toDataURL();
-                // Coarse 32-bit rolling hash to eight hex characters. Deliberately
-                // not a precise fingerprint.
-                var h = 0;
-                for (var i = 0; i < data.length; i++) { h = (Math.imul(h, 31) + data.charCodeAt(i)) | 0; }
-                return (h >>> 0).toString(16);
-            } catch (e) { return ''; }
-        },
+
         // Fill a form's hidden device fields, creating them if absent.
         fill: function (form) {
             var s = MX.device.collect();
@@ -480,6 +520,10 @@
 
     // ------------------------------------------------------------ boot --
     document.addEventListener('DOMContentLoaded', function () {
+        // Prime the asynchronous client hints early so they have resolved by the
+        // time any device-aware form is submitted.
+        MX.device.prime();
+
         // Fill device signals on any form that opts in (the login form). The
         // fields are also refreshed just before submit in case they changed.
         document.querySelectorAll('form[data-device-capture]').forEach(function (form) {
