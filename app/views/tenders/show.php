@@ -589,3 +589,4 @@ function mxDel(url, msg) {
         MX.api('DELETE', url).then(function () { MX.ok('Removed.'); mxReload(); }).catch(function (e) { MX.fail(e.message); });
     });
 }
+</script>
