@@ -51,6 +51,7 @@ return [
     'admin_audit'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Audit Log',              'icon' => 'fa-clipboard-list',  'path' => '/admin/audit',    'permission' => 'admin.audit'],
     'admin_settings' => ['nav' => true,  'section' => 'Admin',  'label' => 'Settings',               'icon' => 'fa-gear',            'path' => '/admin/settings', 'permission' => 'admin.settings'],
     'admin_reset'    => ['nav' => true,  'section' => 'Admin',  'label' => 'Factory Reset',          'icon' => 'fa-triangle-exclamation', 'path' => '/admin/reset', 'permission' => 'system.reset'],
+    'device_audit'   => ['nav' => true,  'section' => 'Admin',  'label' => 'Device Audit',           'icon' => 'fa-fingerprint',     'path' => '/admin/device-audit', 'permission' => 'device_audit.view'],
 
     // Dashboard widgets (not navigation)
     'widget.attendance'        => ['nav' => false, 'label' => 'My attendance',          'permission' => 'attendance.record'],

@@ -755,6 +755,106 @@ function module_visible(string $moduleKey, ?array $user = null): bool
 }
 
 // ---------------------------------------------------------------------------
+// Device fingerprinting (detection sidecar, never a gate)
+// ---------------------------------------------------------------------------
+
+// The client-collected signals posted with a login or check-in request.
+function device_client_signals(): array
+{
+    $in = input();
+    return [
+        'screen'   => mb_substr(trim((string)($in['dev_screen'] ?? '')), 0, 40),
+        'tz'       => mb_substr(trim((string)($in['dev_tz'] ?? '')), 0, 40),
+        'platform' => mb_substr(trim((string)($in['dev_platform'] ?? '')), 0, 80),
+        'canvas'   => mb_substr(trim((string)($in['dev_canvas'] ?? '')), 0, 64),
+    ];
+}
+
+// Compute a device fingerprint from server headers plus posted client signals.
+// The IP is deliberately excluded from the hash, since a person's IP changes
+// legitimately (office, home, mobile) and would fragment one device into many
+// hashes. When no client signals arrived, fall back to a server-only hash and
+// mark it weak, so the admin view can tell a strong fingerprint from a guess.
+function device_fingerprint(array $client): array
+{
+    $ua = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 400);
+    $lang = mb_substr((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''), 0, 40);
+    $hasClient = ($client['screen'] ?? '') !== '' || ($client['canvas'] ?? '') !== '' || ($client['platform'] ?? '') !== '';
+    if ($hasClient) {
+        $material = implode('|', [$ua, $lang, $client['screen'], $client['tz'], $client['platform'], $client['canvas']]);
+        $confidence = 'strong';
+    } else {
+        $material = implode('|', [$ua, $lang]);
+        $confidence = 'weak';
+    }
+    return [
+        'hash'       => hash('sha256', $material),
+        'confidence' => $confidence,
+        'user_agent' => $ua,
+        'platform'   => $client['platform'] ?? '',
+        'screen'     => $client['screen'] ?? '',
+        'language'   => $lang,
+    ];
+}
+
+// Great-circle distance in metres between two coordinates.
+function device_distance_m(float $lat1, float $lng1, float $lat2, float $lng2): float
+{
+    $earth = 6371000.0;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLng = deg2rad($lng2 - $lng1);
+    $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+    return $earth * 2 * atan2(sqrt($a), sqrt(1 - $a));
+}
+
+// Record a device event, best-effort. This is an audit sidecar: it never throws
+// and never blocks the login or check-in it accompanies, and it does nothing at
+// all when the module is switched off. Location is read from the request only
+// for attendance events and only when location capture is enabled.
+function device_record(string $eventType, ?int $userId): void
+{
+    try {
+        if (!in_array($eventType, ['login', 'check_in', 'check_out'], true)) {
+            return;
+        }
+        if (!module_enabled('device_audit')) {
+            return;
+        }
+        $fp = device_fingerprint(device_client_signals());
+
+        $lat = null;
+        $lng = null;
+        $inRange = null;
+        if (($eventType === 'check_in' || $eventType === 'check_out') && setting('attendance_capture_location', '0') === '1') {
+            $in = input();
+            if (isset($in['dev_lat'], $in['dev_lng']) && is_numeric($in['dev_lat']) && is_numeric($in['dev_lng'])) {
+                $lat = (float)$in['dev_lat'];
+                $lng = (float)$in['dev_lng'];
+                $olat = setting('office_latitude', '');
+                $olng = setting('office_longitude', '');
+                if ($olat !== '' && $olng !== '') {
+                    $radius = (float)setting('office_radius_m', '200');
+                    $inRange = device_distance_m((float)$olat, (float)$olng, $lat, $lng) <= $radius ? 1 : 0;
+                }
+            }
+        }
+
+        db_query(
+            'INSERT INTO device_events
+                (user_id, event_type, device_hash, confidence, user_agent, platform, screen, language, ip_address, latitude, longitude, in_range)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                $userId, $eventType, $fp['hash'], $fp['confidence'],
+                $fp['user_agent'] ?: null, $fp['platform'] ?: null, $fp['screen'] ?: null, $fp['language'] ?: null,
+                request_ip(), $lat, $lng, $inRange,
+            ]
+        );
+    } catch (Throwable $ex) {
+        error_log('device_record failed: ' . $ex->getMessage());
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Audit and notifications
 // ---------------------------------------------------------------------------
 

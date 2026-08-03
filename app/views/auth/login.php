@@ -16,7 +16,7 @@
             <h1 style="font-size:20px;margin:0"><?= e($appName) ?></h1>
         </div>
         <p class="text-muted mb-4">Sign in to your workspace.</p>
-        <form method="post" action="/login" data-parsley-validate>
+        <form method="post" action="/login" data-parsley-validate data-device-capture>
             <div class="mb-3">
                 <label class="form-label" for="username">Username</label>
                 <input type="text" class="form-control" id="username" name="username" required maxlength="60" autofocus autocomplete="username">

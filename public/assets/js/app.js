@@ -321,6 +321,52 @@
         return dt;
     };
 
+    // ----------------------------------------------------------- device --
+    // Lightweight, deliberately coarse device signals for the shared-device
+    // detection sidecar. Not an invasive fingerprint: enough to spot the same
+    // device, not to track a person across the internet. Collection is always
+    // optional and best-effort; if it fails the login or check-in proceeds.
+    MX.device = {
+        collect: function () {
+            var s = {};
+            try {
+                s.dev_screen = (screen.width || 0) + 'x' + (screen.height || 0) + 'x' + (screen.colorDepth || 0);
+                s.dev_tz = String(new Date().getTimezoneOffset());
+                s.dev_platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '').slice(0, 80);
+                s.dev_canvas = MX.device._canvas();
+            } catch (e) { /* leave whatever we managed to gather */ }
+            return s;
+        },
+        _canvas: function () {
+            try {
+                var c = document.createElement('canvas');
+                c.width = 200; c.height = 40;
+                var ctx = c.getContext('2d');
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#069';
+                ctx.fillText('Meridian device', 2, 2);
+                ctx.strokeStyle = '#f60';
+                ctx.beginPath(); ctx.arc(50, 20, 15, 0, Math.PI * 2); ctx.stroke();
+                var data = c.toDataURL();
+                // Coarse 32-bit rolling hash to eight hex characters. Deliberately
+                // not a precise fingerprint.
+                var h = 0;
+                for (var i = 0; i < data.length; i++) { h = (Math.imul(h, 31) + data.charCodeAt(i)) | 0; }
+                return (h >>> 0).toString(16);
+            } catch (e) { return ''; }
+        },
+        // Fill a form's hidden device fields, creating them if absent.
+        fill: function (form) {
+            var s = MX.device.collect();
+            Object.keys(s).forEach(function (k) {
+                var input = form.querySelector('input[name="' + k + '"]');
+                if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = k; form.appendChild(input); }
+                input.value = s[k];
+            });
+        }
+    };
+
     // Brief highlight on a row (or any element) whose status changed in place,
     // to draw the eye to what changed. Uses the token-driven flash keyframe.
     MX.flashRow = function (el) {
@@ -434,6 +480,13 @@
 
     // ------------------------------------------------------------ boot --
     document.addEventListener('DOMContentLoaded', function () {
+        // Fill device signals on any form that opts in (the login form). The
+        // fields are also refreshed just before submit in case they changed.
+        document.querySelectorAll('form[data-device-capture]').forEach(function (form) {
+            MX.device.fill(form);
+            form.addEventListener('submit', function () { MX.device.fill(form); });
+        });
+
         // Theme icon reflects the theme applied before first paint.
         const themeIcon = document.getElementById('mx-theme-icon');
         if (themeIcon) {

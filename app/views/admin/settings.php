@@ -58,6 +58,33 @@
                         </div>
                         <div class="form-text">When on, any administrator who has not enrolled is sent to the two-factor setup page on their next request and cannot use the rest of the app until they enrol.</div>
                     </div>
+                    <hr>
+                    <h3 style="font-size:14px" class="mb-2">Attendance location and device audit</h3>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="s-loc" name="attendance_capture_location" <?= ($settings['attendance_capture_location'] ?? '0') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="s-loc">Capture location at check-in</label>
+                        <div class="form-text">Location is requested only at the moment of check-in, never tracked continuously. A staff member can deny it and still check in. Enabling this expands the personal data processed, so inform staff.</div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col">
+                            <label class="form-label" for="s-olat">Office latitude</label>
+                            <input class="form-control" id="s-olat" name="office_latitude" placeholder="-15.7861" value="<?= e($settings['office_latitude'] ?? '') ?>">
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="s-olng">Office longitude</label>
+                            <input class="form-control" id="s-olng" name="office_longitude" placeholder="35.0058" value="<?= e($settings['office_longitude'] ?? '') ?>">
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="s-orad">Radius (m)</label>
+                            <input class="form-control" id="s-orad" name="office_radius_m" pattern="\d{1,6}" value="<?= e($settings['office_radius_m'] ?? '200') ?>">
+                        </div>
+                    </div>
+                    <div class="form-text mb-3">When the office coordinates are set, each captured check-in is flagged in range or out of range for the device audit view.</div>
+                    <div class="mb-3">
+                        <label class="form-label" for="s-devret">Device audit retention (days)</label>
+                        <input class="form-control" id="s-devret" name="device_audit_retention_days" pattern="\d{1,4}" style="max-width:160px" value="<?= e($settings['device_audit_retention_days'] ?? '180') ?>">
+                        <div class="form-text">Device events older than this are pruned by the daily cleanup job.</div>
+                    </div>
                     <button type="button" class="btn btn-primary" onclick="mxSaveSettings()">Save settings</button>
                 </form>
             </div>

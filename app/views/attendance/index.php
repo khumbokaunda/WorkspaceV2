@@ -82,14 +82,36 @@
 var mxCanCorrect = <?= $canCorrect ? 'true' : 'false' ?>;
 var mxCalMonth = '<?= e(date('Y-m')) ?>';
 
+var mxCaptureLocation = <?= setting('attendance_capture_location', '0') === '1' ? 'true' : 'false' ?>;
+
+// Resolve the current position when capture is on, or an empty object on
+// refusal, denial or timeout. Never rejects, so check-in is never blocked.
+function mxWithLocation() {
+    return new Promise(function (resolve) {
+        if (!mxCaptureLocation || !navigator.geolocation) { resolve({}); return; }
+        var done = false;
+        var finish = function (v) { if (!done) { done = true; resolve(v); } };
+        setTimeout(function () { finish({}); }, 8000);
+        navigator.geolocation.getCurrentPosition(
+            function (p) { finish({ dev_lat: p.coords.latitude, dev_lng: p.coords.longitude }); },
+            function () { finish({}); },
+            { enableHighAccuracy: false, timeout: 7000, maximumAge: 60000 }
+        );
+    });
+}
+
 function mxCheckIn() {
     var mode = document.querySelector('input[name="att-mode"]:checked');
-    MX.api('POST', '/attendance/check-in', { mode: mode ? mode.value : 'On-site' })
-        .then(function () { MX.ok('Checked in.'); setTimeout(function () { location.reload(); }, 600); })
-        .catch(function (e) { MX.fail(e.message); });
+    mxWithLocation().then(function (loc) {
+        var payload = Object.assign({ mode: mode ? mode.value : 'On-site' }, MX.device.collect(), loc);
+        MX.api('POST', '/attendance/check-in', payload)
+            .then(function () { MX.ok('Checked in.'); setTimeout(function () { location.reload(); }, 600); })
+            .catch(function (e) { MX.fail(e.message); });
+    });
 }
 function mxCheckOut() {
-    MX.api('POST', '/attendance/check-out', {})
+    var payload = Object.assign({}, MX.device.collect());
+    MX.api('POST', '/attendance/check-out', payload)
         .then(function () { MX.ok('Checked out.'); setTimeout(function () { location.reload(); }, 600); })
         .catch(function (e) { MX.fail(e.message); });
 }

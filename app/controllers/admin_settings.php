@@ -211,6 +211,11 @@ function save(): void
         'cert_notify_manager' => fn($v) => in_array($v, ['0', '1'], true),
         'mail_notifications' => fn($v) => in_array($v, ['0', '1'], true),
         'totp_required_admin' => fn($v) => in_array($v, ['0', '1'], true),
+        'attendance_capture_location' => fn($v) => in_array($v, ['0', '1'], true),
+        'office_latitude' => fn($v) => $v === '' || (is_numeric($v) && (float)$v >= -90 && (float)$v <= 90),
+        'office_longitude' => fn($v) => $v === '' || (is_numeric($v) && (float)$v >= -180 && (float)$v <= 180),
+        'office_radius_m' => fn($v) => (bool)preg_match('/^\d{1,6}$/', $v),
+        'device_audit_retention_days' => fn($v) => (bool)preg_match('/^\d{1,4}$/', $v) && (int)$v >= 1,
     ];
     $changed = [];
     foreach ($editable as $key => $isValid) {

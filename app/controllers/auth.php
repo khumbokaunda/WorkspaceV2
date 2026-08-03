@@ -76,6 +76,7 @@ function login_submit(): void
 
     db_query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [(int)$user['id']]);
     audit('login', 'user', (int)$user['id']);
+    device_record('login', (int)$user['id']);
 
     if ((int)$user['must_change_password'] === 1) {
         redirect('/account/password');
@@ -227,6 +228,7 @@ function totp_challenge_submit(): void
     unset($_SESSION['totp_pending_user'], $_SESSION['totp_pending_at'], $_SESSION['csrf_token']);
     csrf_token();
     db_query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [(int)$user['id']]);
+    device_record('login', (int)$user['id']);
 
     if ($viaRecovery) {
         $remaining = totp_recovery_remaining((int)$user['id']);
