@@ -24,8 +24,8 @@ function device_span_text(int $seconds): string
     <div class="mx-card-body d-flex align-items-start gap-3">
         <i class="fa-solid fa-circle-info" style="font-size:20px;color:var(--mx-info)"></i>
         <div style="font-size:13px">
-            <p class="mb-1">This area shows patterns to review, not proof of anything. A device fingerprint records what device an action came from. It does not prove who was holding it.</p>
-            <p class="text-muted mb-0">Fingerprints are approximate: similar phones look alike, and one person switching browsers looks different. A shared network or office wifi is not flagged here; only a shared device identity across accounts is. Treat every flag as a prompt to look, and act through a conversation and normal management.</p>
+            <p class="mb-1">This area shows patterns to review, not proof of anything. It records what device an action came from. It does not prove who was holding it.</p>
+            <p class="text-muted mb-0">A device is recognised two ways: a stored device identifier that the browser keeps (the firmer signal), and an approximate fingerprint for when that identifier is missing. Both are approximate about people: similar phones look alike, and one person switching browsers looks different. A shared network or office wifi is not flagged here; only a shared device identity across accounts is. Treat every flag as a prompt to look, and act through a conversation and normal management.</p>
         </div>
     </div>
 </div>
@@ -37,17 +37,64 @@ function device_span_text(int $seconds): string
 </ul>
 
 <div class="tab-content">
-    <!-- 6.1 Shared-device flags -->
+    <!-- 6.1 Shared-device flags: token tier first, then hash tier -->
     <div class="tab-pane fade show active" id="pane-flags" role="tabpanel">
-<?php if (!$clusters): ?>
+<?php if (!$tokenClusters && !$hashClusters): ?>
         <div class="mx-card"><div class="mx-card-body"><div class="mx-empty py-4"><i class="fa-solid fa-shield-halved"></i><p class="mb-0">No shared-device patterns in the last <?= (int)DEVICE_AUDIT_LOOKBACK_DAYS ?> days. Nothing to review.</p></div></div></div>
-<?php else: ?>
-<?php foreach ($clusters as $c): ?>
+<?php endif; ?>
+
+<?php if ($tokenClusters): ?>
+        <h2 style="font-size:14px" class="text-muted mb-2"><i class="fa-solid fa-id-badge me-1"></i>Shared device identifier</h2>
+<?php foreach ($tokenClusters as $c): ?>
         <div class="mx-card mb-3" style="border-left:3px solid var(--mx-warning)">
             <div class="mx-card-body">
                 <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
                     <div>
-                        <h2 style="font-size:15px" class="mb-1">One device checked in <?= (int)$c['user_count'] ?> accounts within <?= e(device_span_text((int)$c['span_seconds'])) ?>. Review recommended.</h2>
+                        <h3 style="font-size:15px" class="mb-1">One device checked in <?= (int)$c['user_count'] ?> accounts within <?= e(device_span_text((int)$c['span_seconds'])) ?>. Review recommended.</h3>
+                        <div class="text-muted" style="font-size:12px">
+                            <?= e(date('j M Y', strtotime($c['day']))) ?>,
+                            <?= e(date('H:i', strtotime($c['first_at']))) ?> to <?= e(date('H:i', strtotime($c['last_at']))) ?>
+                            &middot; <span class="mx-chip mx-chip-warning">stored identifier</span>
+<?php if ($c['hash_agrees']): ?>
+                            &middot; <span class="mx-chip mx-chip-info">fingerprint agrees</span>
+<?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <code style="font-size:11px" title="Persistent device identifier"><?= e($c['token_short']) ?></code>
+                    </div>
+                </div>
+                <div class="mt-2 p-2" style="background:var(--mx-bg);border:1px solid var(--mx-border);border-radius:8px;font-size:12px">
+                    <div class="text-muted" style="word-break:break-all"><strong>Device:</strong> <?= e($c['platform'] ?: 'unknown platform') ?> &middot; <?= e($c['screen'] ?: 'unknown screen') ?> &middot; <?= e($c['language'] ?: '') ?></div>
+                    <div class="text-muted" style="word-break:break-all"><?= e($c['user_agent'] ?: '') ?></div>
+                </div>
+                <div class="table-responsive mt-2">
+                    <table class="table align-middle mb-0" style="font-size:13px">
+                        <thead><tr><th>Account</th><th>Person</th><th>Checked in</th></tr></thead>
+                        <tbody>
+<?php foreach ($c['members'] as $m): ?>
+                            <tr>
+                                <td><strong><?= e($m['username']) ?></strong></td>
+                                <td><?= e(trim((string)$m['name'])) ?: '<span class="text-muted">Not linked</span>' ?></td>
+                                <td class="mx-tabular"><?= e(date('H:i:s', strtotime((string)$m['at']))) ?></td>
+                            </tr>
+<?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<?php if ($hashClusters): ?>
+        <h2 style="font-size:14px" class="text-muted mb-2 mt-4"><i class="fa-solid fa-fingerprint me-1"></i>Shared fingerprint only<span class="text-muted fw-normal" style="font-size:12px"> &middot; softer signal, where no stored identifier matched</span></h2>
+<?php foreach ($hashClusters as $c): ?>
+        <div class="mx-card mb-3" style="border-left:3px solid var(--mx-plain, var(--mx-border))">
+            <div class="mx-card-body">
+                <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+                    <div>
+                        <h3 style="font-size:15px" class="mb-1">One device checked in <?= (int)$c['user_count'] ?> accounts within <?= e(device_span_text((int)$c['span_seconds'])) ?>. Review recommended.</h3>
                         <div class="text-muted" style="font-size:12px">
                             <?= e(date('j M Y', strtotime($c['day']))) ?>,
                             <?= e(date('H:i', strtotime($c['first_at']))) ?> to <?= e(date('H:i', strtotime($c['last_at']))) ?>

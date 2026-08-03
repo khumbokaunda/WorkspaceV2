@@ -49,8 +49,8 @@ function check_in(): void
         [$personId, $today, $now, $mode, $state]
     );
     audit('attendance.check_in', 'attendance', db_insert_id(), ['mode' => $mode, 'state' => $state, 'time' => $now]);
-    device_record('check_in', (int)(current_user()['id'] ?? 0) ?: null);
-    json_ok(['state' => $state, 'check_in' => substr($now, 0, 5), 'mode' => $mode]);
+    $deviceToken = device_record('check_in', (int)(current_user()['id'] ?? 0) ?: null);
+    json_ok(['state' => $state, 'check_in' => substr($now, 0, 5), 'mode' => $mode, 'device_token' => $deviceToken]);
 }
 
 function check_out(): void
@@ -66,8 +66,8 @@ function check_out(): void
     $now = date('H:i:s');
     db_query('UPDATE attendance SET check_out = ? WHERE id = ?', [$now, (int)$row['id']]);
     audit('attendance.check_out', 'attendance', (int)$row['id'], ['time' => $now]);
-    device_record('check_out', (int)(current_user()['id'] ?? 0) ?: null);
-    json_ok(['check_out' => substr($now, 0, 5)]);
+    $deviceToken = device_record('check_out', (int)(current_user()['id'] ?? 0) ?: null);
+    json_ok(['check_out' => substr($now, 0, 5), 'device_token' => $deviceToken]);
 }
 
 // Personal month for the heatmap: attendance states plus approved leave days.

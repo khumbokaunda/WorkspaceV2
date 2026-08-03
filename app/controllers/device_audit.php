@@ -15,10 +15,12 @@ function index(): void
     // Viewing staff device data is itself an access event worth recording.
     audit('device_audit.view', 'device_events', null);
 
+    $clusters = device_shared_clusters();
     render('admin/device_audit', [
         'pageTitle' => 'Device Audit',
         'breadcrumbs' => ['Admin' => null, 'Device Audit' => null],
-        'clusters' => device_shared_clusters(),
+        'tokenClusters' => $clusters['token'],
+        'hashClusters' => $clusters['hash'],
         'users' => db_all(
             "SELECT u.id, u.username,
                     TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) AS name
@@ -29,13 +31,77 @@ function index(): void
     ]);
 }
 
-// Panel 6.1: clusters where one device_hash produced check_in events for two or
-// more distinct users on the same calendar day, most suspicious first (largest
-// and tightest clusters at the top).
+// Panel 6.1: shared-device flags, in two tiers.
+//
+//  - Token tier (hard): one persistent device token that checked in two or more
+//    distinct accounts on the same day. The token survives cache clears, so this
+//    is the high-confidence signal, and it is shown first.
+//  - Hash tier (soft): one inferred fingerprint hash shared across accounts. This
+//    catches the case the token cannot, a cleared token or a private window, at
+//    the cost of being approximate. A hash flag that is already explained by a
+//    token flag is suppressed here, so each shared device is reported once.
+//
+// When a token flag's events also all share a single fingerprint hash, the two
+// identifiers agree, which is the strongest signal of all; the token flag is
+// marked accordingly.
 function device_shared_clusters(): array
 {
-    $rows = db_all(
-        "SELECT device_hash, DATE(created_at) AS day,
+    // Token tier.
+    $tokenRows = db_all(
+        "SELECT device_token AS ident, DATE(created_at) AS day,
+                COUNT(DISTINCT user_id) AS users,
+                MIN(created_at) AS first_at, MAX(created_at) AS last_at,
+                COUNT(*) AS events,
+                COUNT(DISTINCT device_hash) AS hash_variants,
+                MAX(device_hash) AS a_hash
+         FROM device_events
+         WHERE event_type = 'check_in' AND user_id IS NOT NULL AND device_token IS NOT NULL
+           AND created_at >= (NOW() - INTERVAL ? DAY)
+         GROUP BY device_token, DATE(created_at)
+         HAVING users >= 2
+         ORDER BY users DESC, TIMESTAMPDIFF(SECOND, MIN(created_at), MAX(created_at)) ASC
+         LIMIT 100",
+        [DEVICE_AUDIT_LOOKBACK_DAYS]
+    );
+
+    $tokenClusters = [];
+    $coveredHashDays = []; // (hash|day) already explained by a token flag
+    foreach ($tokenRows as $r) {
+        $token = (string)$r['ident'];
+        $day = (string)$r['day'];
+        $members = device_cluster_members('device_token', $token, $day);
+        $rep = db_row(
+            'SELECT confidence, user_agent, platform, screen, language
+             FROM device_events WHERE device_token = ? ORDER BY created_at DESC LIMIT 1',
+            [$token]
+        ) ?: [];
+        // The two identifiers agree when every event under this token shares one
+        // fingerprint hash.
+        $hashAgrees = (int)$r['hash_variants'] === 1;
+        if ($hashAgrees) {
+            $coveredHashDays[(string)$r['a_hash'] . '|' . $day] = true;
+        }
+        $tokenClusters[] = [
+            'device_token' => $token,
+            'token_short' => substr($token, 0, 12),
+            'day' => $day,
+            'user_count' => (int)$r['users'],
+            'first_at' => (string)$r['first_at'],
+            'last_at' => (string)$r['last_at'],
+            'span_seconds' => max(0, strtotime((string)$r['last_at']) - strtotime((string)$r['first_at'])),
+            'confidence' => (string)($rep['confidence'] ?? 'weak'),
+            'hash_agrees' => $hashAgrees,
+            'user_agent' => (string)($rep['user_agent'] ?? ''),
+            'platform' => (string)($rep['platform'] ?? ''),
+            'screen' => (string)($rep['screen'] ?? ''),
+            'language' => (string)($rep['language'] ?? ''),
+            'members' => $members,
+        ];
+    }
+
+    // Hash tier.
+    $hashRows = db_all(
+        "SELECT device_hash AS ident, DATE(created_at) AS day,
                 COUNT(DISTINCT user_id) AS users,
                 MIN(created_at) AS first_at, MAX(created_at) AS last_at,
                 COUNT(*) AS events
@@ -49,27 +115,22 @@ function device_shared_clusters(): array
         [DEVICE_AUDIT_LOOKBACK_DAYS]
     );
 
-    $clusters = [];
-    foreach ($rows as $r) {
-        $hash = (string)$r['device_hash'];
+    $hashClusters = [];
+    foreach ($hashRows as $r) {
+        $hash = (string)$r['ident'];
         $day = (string)$r['day'];
-        $members = db_all(
-            "SELECT de.user_id, u.username, MIN(de.created_at) AS at,
-                    TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) AS name
-             FROM device_events de
-             JOIN users u ON u.id = de.user_id
-             LEFT JOIN people p ON p.id = u.person_id
-             WHERE de.device_hash = ? AND de.event_type = 'check_in' AND DATE(de.created_at) = ?
-             GROUP BY de.user_id, u.username
-             ORDER BY at",
-            [$hash, $day]
-        );
+        // Skip hash flags already reported under a token flag, so a shared
+        // device is not listed twice.
+        if (isset($coveredHashDays[$hash . '|' . $day])) {
+            continue;
+        }
+        $members = device_cluster_members('device_hash', $hash, $day);
         $rep = db_row(
-            'SELECT confidence, user_agent, platform, screen, language, ip_address
+            'SELECT confidence, user_agent, platform, screen, language
              FROM device_events WHERE device_hash = ? ORDER BY created_at DESC LIMIT 1',
             [$hash]
         ) ?: [];
-        $clusters[] = [
+        $hashClusters[] = [
             'device_hash' => $hash,
             'label' => device_label($hash),
             'day' => $day,
@@ -85,7 +146,27 @@ function device_shared_clusters(): array
             'members' => $members,
         ];
     }
-    return $clusters;
+
+    return ['token' => $tokenClusters, 'hash' => $hashClusters];
+}
+
+// The distinct accounts that checked in under one identifier on one day, in the
+// order they first appeared. $column is a trusted literal ('device_token' or
+// 'device_hash'), never user input.
+function device_cluster_members(string $column, string $value, string $day): array
+{
+    $col = $column === 'device_token' ? 'device_token' : 'device_hash';
+    return db_all(
+        "SELECT de.user_id, u.username, MIN(de.created_at) AS at,
+                TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) AS name
+         FROM device_events de
+         JOIN users u ON u.id = de.user_id
+         LEFT JOIN people p ON p.id = u.person_id
+         WHERE de.$col = ? AND de.event_type = 'check_in' AND DATE(de.created_at) = ?
+         GROUP BY de.user_id, u.username
+         ORDER BY at",
+        [$value, $day]
+    );
 }
 
 // The label an administrator gave a device, if any.
@@ -146,7 +227,7 @@ function events_json(): void
         $where[] = 'de.user_id = ?';
         $params[] = (int)$_GET['user_id'];
     }
-    $sql = "SELECT de.id, de.user_id, u.username, de.event_type, de.device_hash, de.confidence,
+    $sql = "SELECT de.id, de.user_id, u.username, de.event_type, de.device_hash, de.device_token, de.confidence,
                    de.ip_address, de.in_range, de.created_at
             FROM device_events de LEFT JOIN users u ON u.id = de.user_id"
         . ($where ? ' WHERE ' . implode(' AND ', $where) : '')

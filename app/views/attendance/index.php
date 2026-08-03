@@ -105,14 +105,14 @@ function mxCheckIn() {
     mxWithLocation().then(function (loc) {
         var payload = Object.assign({ mode: mode ? mode.value : 'On-site' }, MX.device.collect(), loc);
         MX.api('POST', '/attendance/check-in', payload)
-            .then(function () { MX.ok('Checked in.'); setTimeout(function () { location.reload(); }, 600); })
+            .then(function (d) { if (d && d.device_token) MX.device.adopt(d.device_token); MX.ok('Checked in.'); setTimeout(function () { location.reload(); }, 600); })
             .catch(function (e) { MX.fail(e.message); });
     });
 }
 function mxCheckOut() {
     var payload = Object.assign({}, MX.device.collect());
     MX.api('POST', '/attendance/check-out', payload)
-        .then(function () { MX.ok('Checked out.'); setTimeout(function () { location.reload(); }, 600); })
+        .then(function (d) { if (d && d.device_token) MX.device.adopt(d.device_token); MX.ok('Checked out.'); setTimeout(function () { location.reload(); }, 600); })
         .catch(function (e) { MX.fail(e.message); });
 }
 

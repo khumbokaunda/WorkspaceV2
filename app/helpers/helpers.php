@@ -758,35 +758,92 @@ function module_visible(string $moduleKey, ?array $user = null): bool
 // Device fingerprinting (detection sidecar, never a gate)
 // ---------------------------------------------------------------------------
 
-// The client-collected signals posted with a login or check-in request.
+// A missing signal is folded into the hash as this fixed constant, never as an
+// empty string or a random value. That is the whole stability contract: a
+// browser that never exposes deviceMemory hashes the same every time, so the
+// absence of a signal does not fork one device into many identities.
+const DEVICE_SIGNAL_UNAVAILABLE = 'na';
+
+// The client-collected signals posted with a login or check-in request. These
+// are high-stability inputs only: the WebGL renderer and vendor strings (the
+// single most distinguishing signal), the user-agent client hints, the fixed
+// hardware counts, and the screen geometry, timezone and platform. Nothing
+// volatile (battery, precise viewport, anything time-derived) is read here, and
+// there is deliberately no canvas or audio fingerprinting.
 function device_client_signals(): array
 {
     $in = input();
+    $get = static function (string $k, int $len) use ($in): string {
+        return mb_substr(trim((string)($in[$k] ?? '')), 0, $len);
+    };
     return [
-        'screen'   => mb_substr(trim((string)($in['dev_screen'] ?? '')), 0, 40),
-        'tz'       => mb_substr(trim((string)($in['dev_tz'] ?? '')), 0, 40),
-        'platform' => mb_substr(trim((string)($in['dev_platform'] ?? '')), 0, 80),
-        'canvas'   => mb_substr(trim((string)($in['dev_canvas'] ?? '')), 0, 64),
+        'gpu'      => $get('dev_gpu', 200),      // UNMASKED_RENDERER ~ UNMASKED_VENDOR
+        'hints'    => $get('dev_hints', 300),    // model|platformVersion|architecture|bitness|fullVersionList
+        'cores'    => $get('dev_cores', 12),     // navigator.hardwareConcurrency
+        'memory'   => $get('dev_memory', 12),    // navigator.deviceMemory
+        'touch'    => $get('dev_touch', 12),     // navigator.maxTouchPoints
+        'screen'   => $get('dev_screen', 40),    // WxHxdepth@devicePixelRatio
+        'tz'       => $get('dev_tz', 60),        // IANA zone, e.g. Africa/Blantyre
+        'platform' => $get('dev_platform', 80),  // navigator.platform / userAgentData.platform
     ];
+}
+
+// The persistent device token posted from localStorage, validated. Empty when
+// the browser has never been issued one (first sight, cleared storage, private
+// window), in which case device_record mints a fresh one.
+function device_posted_token(): string
+{
+    $t = trim((string)(input()['dev_token'] ?? ''));
+    return preg_match('/^[a-f0-9]{40}$/', $t) === 1 ? $t : '';
 }
 
 // Compute a device fingerprint from server headers plus posted client signals.
 // The IP is deliberately excluded from the hash, since a person's IP changes
 // legitimately (office, home, mobile) and would fragment one device into many
-// hashes. When no client signals arrived, fall back to a server-only hash and
-// mark it weak, so the admin view can tell a strong fingerprint from a guess.
+// hashes. The persistent device token is likewise excluded: it is an
+// independent hard identifier, never part of this inferred hash. When rich
+// client signals arrived the hash is strong; when only the server headers are
+// available it falls back to a server-only hash and is marked weak, so the
+// admin view can tell a real fingerprint from a guess.
 function device_fingerprint(array $client): array
 {
     $ua = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 400);
-    $lang = mb_substr((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''), 0, 40);
-    $hasClient = ($client['screen'] ?? '') !== '' || ($client['canvas'] ?? '') !== '' || ($client['platform'] ?? '') !== '';
+    $lang = mb_substr((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''), 0, 60);
+
+    // Every field resolves to its value or the fixed unavailable constant, so a
+    // missing signal is stable rather than a new identity. Keys are prefixed so
+    // an empty field can never collide with the value of another.
+    $pick = static function ($v): string {
+        $v = trim((string)$v);
+        return $v !== '' ? $v : DEVICE_SIGNAL_UNAVAILABLE;
+    };
+
+    // Strong when we have meaningful client signals to bind to; weak when the
+    // request carried nothing but server headers.
+    $hasClient = ($client['gpu'] ?? '') !== ''
+        || ($client['screen'] ?? '') !== ''
+        || ($client['platform'] ?? '') !== ''
+        || ($client['hints'] ?? '') !== '';
+
     if ($hasClient) {
-        $material = implode('|', [$ua, $lang, $client['screen'], $client['tz'], $client['platform'], $client['canvas']]);
+        $material = implode('|', [
+            'ua=' . $pick($ua),
+            'lang=' . $pick($lang),
+            'gpu=' . $pick($client['gpu'] ?? ''),
+            'hints=' . $pick($client['hints'] ?? ''),
+            'cores=' . $pick($client['cores'] ?? ''),
+            'mem=' . $pick($client['memory'] ?? ''),
+            'touch=' . $pick($client['touch'] ?? ''),
+            'screen=' . $pick($client['screen'] ?? ''),
+            'tz=' . $pick($client['tz'] ?? ''),
+            'plat=' . $pick($client['platform'] ?? ''),
+        ]);
         $confidence = 'strong';
     } else {
-        $material = implode('|', [$ua, $lang]);
+        $material = implode('|', ['ua=' . $pick($ua), 'lang=' . $pick($lang)]);
         $confidence = 'weak';
     }
+
     return [
         'hash'       => hash('sha256', $material),
         'confidence' => $confidence,
@@ -811,16 +868,31 @@ function device_distance_m(float $lat1, float $lng1, float $lat2, float $lng2): 
 // and never blocks the login or check-in it accompanies, and it does nothing at
 // all when the module is switched off. Location is read from the request only
 // for attendance events and only when location capture is enabled.
-function device_record(string $eventType, ?int $userId): void
+//
+// Returns the effective persistent device token (the one the client replayed,
+// or a freshly minted one when the client had none) so the caller can deliver
+// it back to the browser for storage; returns null when the module is off or
+// nothing was recorded. The token is also stashed in the session so the next
+// rendered page can hand it to a browser that arrived through a redirect (the
+// login flow), which has no JSON response to read it from.
+function device_record(string $eventType, ?int $userId): ?string
 {
     try {
         if (!in_array($eventType, ['login', 'check_in', 'check_out'], true)) {
-            return;
+            return null;
         }
         if (!module_enabled('device_audit')) {
-            return;
+            return null;
         }
         $fp = device_fingerprint(device_client_signals());
+
+        // The token is a hard, independent identifier: replay the client's if it
+        // sent a valid one, otherwise mint a fresh 40-character token. It is never
+        // part of the fingerprint hash above.
+        $token = device_posted_token();
+        if ($token === '') {
+            $token = bin2hex(random_bytes(20));
+        }
 
         $lat = null;
         $lng = null;
@@ -841,16 +913,25 @@ function device_record(string $eventType, ?int $userId): void
 
         db_query(
             'INSERT INTO device_events
-                (user_id, event_type, device_hash, confidence, user_agent, platform, screen, language, ip_address, latitude, longitude, in_range)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                (user_id, event_type, device_hash, device_token, confidence, user_agent, platform, screen, language, ip_address, latitude, longitude, in_range)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
             [
-                $userId, $eventType, $fp['hash'], $fp['confidence'],
+                $userId, $eventType, $fp['hash'], $token, $fp['confidence'],
                 $fp['user_agent'] ?: null, $fp['platform'] ?: null, $fp['screen'] ?: null, $fp['language'] ?: null,
                 request_ip(), $lat, $lng, $inRange,
             ]
         );
+
+        // Hand the token to the next full page render (the redirect-based login
+        // flow has no JSON body to carry it), and return it for callers that do
+        // answer with JSON (check-in and check-out).
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['device_token_issue'] = $token;
+        }
+        return $token;
     } catch (Throwable $ex) {
         error_log('device_record failed: ' . $ex->getMessage());
+        return null;
     }
 }
 

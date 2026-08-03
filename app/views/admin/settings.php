@@ -83,7 +83,7 @@
                     <div class="mb-3">
                         <label class="form-label" for="s-devret">Device audit retention (days)</label>
                         <input class="form-control" id="s-devret" name="device_audit_retention_days" pattern="\d{1,4}" style="max-width:160px" value="<?= e($settings['device_audit_retention_days'] ?? '180') ?>">
-                        <div class="form-text">Device events older than this are pruned by the daily cleanup job.</div>
+                        <div class="form-text">Device events older than this are pruned by the daily cleanup job. When the device audit module is on, each login and check-in records the device it came from: a stored identifier kept in the browser plus an approximate fingerprint. This is for spotting one device acting for many people; it never blocks anyone, and inform staff that their devices are recognised this way.</div>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="mxSaveSettings()">Save settings</button>
                 </form>
